@@ -22,8 +22,10 @@ def supply_args():
     """
     parser = argparse.ArgumentParser(description='Nanostring output RCC readouts (html format) and '
                                                  'converts to matrix, geomean normalized values')
-    parser.add_argument('samplesheet', help='samplesheet.txt')
+    parser.add_argument('samplesheet', type = argparse.FileType('r'), help='samplesheet.txt')
     parser.add_argument('rcc_dir', help='raw RCC files directory')
+    parser.add_argument('--abfile', nargs='?', type=argparse.FileType('r'),
+                        help='ANTIBODY_REFERENCE.csv')
     parser.add_argument('--version', action='version', version='%(prog)s ' + VERSION)
     args = parser.parse_args()
     return args
@@ -59,6 +61,21 @@ def parseRCC(rcc_file):
 
     return(dfcounts, df_samp_attrib, df_lane_attrib)
 
+def parse_Ab_ref(abfile):
+    """
+    get antibody shortnames.
+    Args:
+        ab_handle
+    Returns:
+        dict
+    Examples:
+    """
+    ab_name ={}
+    for line in abfile:
+        if not line.lstrip().startswith('#'):
+            items = line.strip().split(",")
+            ab_name[items[1]] = items[0]
+    return(ab_name)
 
 def parse_samplesheet(samplesheet):
     """
@@ -71,8 +88,8 @@ def parse_samplesheet(samplesheet):
     Examples:
     """
     ss_dict = {}
-    with open(samplesheet, 'r') as ss_handle:
-        for line in ss_handle:
+    with samplesheet:
+        for line in samplesheet:
             items = line.strip().split("\t")
             ss_dict[items[0]] = items[1]
     return(ss_dict)
@@ -83,6 +100,9 @@ def main():
     args = supply_args()
 
     sampleid = parse_samplesheet(args.samplesheet)
+
+
+
     rcc_counts_dict = {}
     samp_attrib_dict = {}
     lane_attrib_dict = {}
@@ -99,7 +119,9 @@ def main():
             dfrcc.rename(columns={'Count': sampleid[file]}, inplace=True)
             rcc_counts_dict[sampleid[file]] = dfrcc
 
-            df_lane_attrib.rename(columns={df_lane_attrib.columns[1]: sampleid[file]}, inplace=True)
+            #df_lane_attrib.rename(columns={df_lane_attrib.columns[1]: sampleid[file]}, inplace=True)
+            df_lane_attrib = df_lane_attrib.append(pandas.Series(['SampleName', sampleid[file]],
+                                            index=df_lane_attrib.columns),ignore_index=True)
             lane_attrib_dict[df_lane_attrib.columns[1]] = df_lane_attrib
 
             samp_attrib_dict[sampleid[file]] = df_samp_attrib
@@ -113,7 +135,22 @@ def main():
     lane_attrib = reduce(lambda x, y: pandas.merge(x, y, on=['ID']),
                          lane_attrib_dict.values())
 
-    raw_data.to_csv(args.rcc_dir + "/"+ batch_name+ "_rawdata.txt", sep='\t', index=False)
+    try:
+        os.mkdir(args.rcc_dir + "/" + batch_name + "_OUTPUT")
+    except OSError:
+        pass
+    outputDir = args.rcc_dir + "/" + batch_name + "_OUTPUT"
+
+    # Change long name to something else if necessary
+    if args.abfile:
+        with args.abfile:
+            ab_name = parse_Ab_ref(args.abfile)
+        for name in raw_data["Name"].iteritems():
+            if not re.search("POS|NEG", name[1]):
+                #print(name)
+                raw_data['Name'][name[0]] = ab_name[name[1].strip().split("|")[0]]
+
+    raw_data.to_csv(outputDir + "/" + batch_name + "_rawdata.txt", sep='\t', index=False)
 
     #test to see if samp_attribs are all the same
     for v in range(len(samp_attrib_dict.values()) - 1):
@@ -123,7 +160,7 @@ def main():
         else:
             print("Samples are from one batch. OK")
 
-    with open(args.rcc_dir + "/" + batch_name + "_run_metrics.txt", 'w') as met:
+    with open(outputDir + "/"+ batch_name+ "_run_metrics.txt", 'w') as met:
         met.write(samp_attrib_dict.values()[0].to_csv(sep="\t"))
         met.write(lane_attrib.to_csv(sep="\t"))
 
