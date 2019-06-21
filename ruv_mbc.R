@@ -5,8 +5,8 @@ usage = "
 ./ruv_mbc.R input_NORMALIZED.xlsx validation_file validation_md
 
 input_file= NORMALIZED.xlsx. Will look for igg_geosamp_corrected sheet. 
-validation_dataset = txt file of validation data normalized
-validation_metadata =xlsx with metastatic breast cancer list. 
+validation_file = txt file of validation data normalized
+validation_md =xlsx with metastatic breast cancer list. 
 "
 
 argsLen <- length(args);
@@ -58,8 +58,9 @@ omitregex = paste0(paste0("^", omit), collapse = "|")
 
 
 #VALIDATION DATA
+
+#validation_file = "/Users/patterja/Box Sync/NANOSTRING/REFERENCE_FILES/ALLvalidation_samples_normalized.txt"
 #validation_md = "/Users/patterja/Box Sync/NANOSTRING/VALIDATION/ALL_validation_samples.xlsx"
-#validation_file = "/Users/patterja/Box Sync/NANOSTRING/REFERENCE_FILES/ALLvalidation_samples_corrected.txt"
 
 mbc_md = read.xlsx(file= validation_md, sheetName = "MBC")
 igg_geosamp = read.csv(validation_file, sep= "\t", row.names = 1)
@@ -120,7 +121,7 @@ write.table(ctl_validation, file = paste0(dirname(normalizePath(input_file)), "/
 
 # - mbc filtered from metadata sheet only, excludes some samples in igg_geosamp
 mbcctl = cbind(ctl_norm, mbc_norm[match(rownames(ctl_norm), rownames(mbc_norm)),])
-dir.create(file.path(paste0(dirname(normalizePath(input_file)), "/ruv_figures"), showWarnings = F))
+dir.create(file.path(paste0(dirname(normalizePath(input_file)), "/ruv_figures")))
 
 
 

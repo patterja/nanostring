@@ -122,9 +122,9 @@ geomean_norm <- function(samples, controls, pos, mm, rb){
               "geomean_normbysample"=mat_gmcf[,c(controls, setdiff(colnames(samples), controls))], 
               "igg_geosamp_corrected"= igg_corrected[,c(controls, setdiff(colnames(samples), controls))], 
               "igg_geosamp_corrected_up" = up_iggc[,c(controls, setdiff(colnames(samples), controls))], 
-              "igg_geosamp_corrected_down" = down_iggc[,c(controls, setdiff(colnames(samples), controls))],
-              "residual"=zmat[,c(controls, setdiff(colnames(samples), controls))], 
-              "stats"=data.frame("Geomean_Ab_controls" = geomean_cfrow, "standard_error_Ab_controls" = se_logAb)))
+              "igg_geosamp_corrected_down" = down_iggc[,c(controls, setdiff(colnames(samples), controls))]))
+              #"residual"=zmat[,c(controls, setdiff(colnames(samples), controls))], 
+              #"stats"=data.frame("Geomean_Ab_controls" = geomean_cfrow, "standard_error_Ab_controls" = se_logAb)))
 }
 
 
@@ -208,7 +208,7 @@ pm_migg= ggplot(migg_ci, aes(Var2, Var1)) +
         axis.text.x = element_text(angle=90,hjust = 1, size=8, colour="black"),
         axis.text.y = element_text(size=8, colour="black"))
 
-ggsave(filename = paste0(outfile_name, "_residual_HEATMAP.png"), plot=pmzmat,width = 11, height = 8.5)
-ggsave(filename = paste0(outfile_name, "_normalized_HEATMAP_CI.png"), plot=pm_migg,width = 11, height = 7)
+#ggsave(filename = paste0(outfile_name, "_residual_HEATMAP.png"), plot=pmzmat,width = 11, height = 8.5)
+#ggsave(filename = paste0(outfile_name, "_normalized_HEATMAP_CI.png"), plot=pm_migg,width = 11, height = 7)
 
 
