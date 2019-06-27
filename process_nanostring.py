@@ -1,11 +1,18 @@
 #!/usr/bin/env python
 
-#USAGE:
-# Nanostring output RCC readouts (html format) to raw data matrix
-#NOTES:
-#TODO: break out test: checking sample metrics and check for unique sample names in sample sheet
-#ARGUMENTS:
-#RETURN:
+## USAGE:
+#   Nanostring output RCC readouts (html format) to raw data matrix
+## NOTES:
+#   TODO: break out test
+#       checking sample metrics
+#       check for unique sample names in sample sheet
+## ARGUMENTS:
+#   samplesheet: tsv of RCC filename in one col and sample name, 'ANTIBODY_REFERENCE.csv'
+#   rcc files
+#   abfile: antibody file to rename antibody names.
+## RETURN:
+#   rawdata.txt: tab-sep file with table of Antibody x Sample
+#
 import os
 import re
 import argparse
@@ -14,23 +21,19 @@ import xml.etree.ElementTree as ET
 
 VERSION="0.1.0"
 
-
-
 def supply_args():
     """
     Input arguments
     """
     parser = argparse.ArgumentParser(description='Nanostring output RCC readouts (html format) and '
-                                                 'converts to matrix, geomean normalized values')
+                                                 'converts to raw data tsv')
     parser.add_argument('samplesheet', type = argparse.FileType('r'), help='samplesheet.txt')
-    parser.add_argument('rcc_dir', help='raw RCC files directory')
+    parser.add_argument('rcc_files', type=str, nargs='+', help='raw RCC files')
     parser.add_argument('--abfile', nargs='?', type=argparse.FileType('r'),
                         help='ANTIBODY_REFERENCE.csv')
     parser.add_argument('--version', action='version', version='%(prog)s ' + VERSION)
     args = parser.parse_args()
     return args
-
-
 
 def parseRCC(rcc_file):
     """
@@ -94,26 +97,22 @@ def parse_samplesheet(samplesheet):
             ss_dict[items[0]] = items[1]
     return(ss_dict)
 
-
 def main():
 
     args = supply_args()
 
     sampleid = parse_samplesheet(args.samplesheet)
 
-
-
     rcc_counts_dict = {}
     samp_attrib_dict = {}
     lane_attrib_dict = {}
 
-    for file in os.listdir(args.rcc_dir):
-        rcc_dir = args.rcc_dir
+    rcc_dir = os.path.dirname(args.rcc_files[1])
+    for file in args.rcc_files:
         if file.endswith(".RCC"):
-
             #get sample number
             samp_number = re.sub(".RCC", "", file.split("_")[-1])
-            dfrcc, df_samp_attrib, df_lane_attrib = parseRCC(os.path.join(rcc_dir + "/", file))
+            dfrcc, df_samp_attrib, df_lane_attrib = parseRCC(file)
 
             #rename column name with sample id
             dfrcc.rename(columns={'Count': sampleid[file]}, inplace=True)
@@ -135,11 +134,12 @@ def main():
     lane_attrib = reduce(lambda x, y: pandas.merge(x, y, on=['ID']),
                          lane_attrib_dict.values())
 
+    outputDir = os.path.join(rcc_dir + "OUTPUT")
     try:
-        os.mkdir(args.rcc_dir + "/" + batch_name + "_OUTPUT")
+        os.mkdir(outputDir)
     except OSError:
         pass
-    outputDir = args.rcc_dir + "/" + batch_name + "_OUTPUT"
+
 
     # Change long name to something else if necessary
     if args.abfile:
@@ -150,7 +150,7 @@ def main():
                 #print(name)
                 raw_data['Name'][name[0]] = ab_name[name[1].strip().split("|")[0]]
 
-    raw_data.to_csv(outputDir + "/" + batch_name + "_rawdata.txt", sep='\t', index=False)
+    raw_data.to_csv(outputDir + "/rawdata.txt", sep='\t', index=False)
 
     #test to see if samp_attribs are all the same
     for v in range(len(samp_attrib_dict.values()) - 1):
@@ -160,10 +160,9 @@ def main():
         else:
             print("Samples are from one batch. OK")
 
-    with open(outputDir + "/"+ batch_name+ "_run_metrics.txt", 'w') as met:
+    with open(outputDir + "/run_metrics.txt", 'w') as met:
         met.write(samp_attrib_dict.values()[0].to_csv(sep="\t"))
         met.write(lane_attrib.to_csv(sep="\t"))
-
 
 if __name__ == "__main__":
     main()
