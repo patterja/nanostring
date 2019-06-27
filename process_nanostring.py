@@ -3,9 +3,10 @@
 ## USAGE:
 #   Nanostring output RCC readouts (html format) to raw data matrix
 ## NOTES:
-#   TODO: break out test
+#   TODO: break out tests
 #       checking sample metrics
 #       check for unique sample names in sample sheet
+#
 ## ARGUMENTS:
 #   samplesheet: tsv of RCC filename in one col and sample name, 'ANTIBODY_REFERENCE.csv'
 #   rcc files
@@ -27,8 +28,8 @@ def supply_args():
     """
     parser = argparse.ArgumentParser(description='Nanostring output RCC readouts (html format) and '
                                                  'converts to raw data tsv')
-    parser.add_argument('samplesheet', type = argparse.FileType('r'), help='samplesheet.txt')
     parser.add_argument('rcc_files', type=str, nargs='+', help='raw RCC files')
+    parser.add_argument('--samplesheet', type=argparse.FileType('r'), help='samplesheet.txt')
     parser.add_argument('--abfile', nargs='?', type=argparse.FileType('r'),
                         help='ANTIBODY_REFERENCE.csv')
     parser.add_argument('--version', action='version', version='%(prog)s ' + VERSION)
@@ -100,6 +101,9 @@ def parse_samplesheet(samplesheet):
 def main():
 
     args = supply_args()
+    if len(args.rcc_files) < 12:
+        lrcc = len(args.rcc_files)
+        print("Only ", lrcc, " RCC files specified!\nContinuing with ", lrcc, " files.")
 
     sampleid = parse_samplesheet(args.samplesheet)
 
@@ -135,10 +139,12 @@ def main():
                          lane_attrib_dict.values())
 
     outputDir = os.path.join(rcc_dir + "OUTPUT")
+
     try:
         os.mkdir(outputDir)
-    except OSError:
-        pass
+    except OSError as e:
+        if e.errno != 17:
+            raise
 
 
     # Change long name to something else if necessary
