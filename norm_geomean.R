@@ -87,11 +87,11 @@ geomean_norm <- function(samples, controls, pos, mm, rb){
   #' @export
   
   #normalize lize by positive control
-  pos_cf=mean(apply(pos[,(colnames(pos) %in% controls)], 2, sum))/apply(pos[,controls], 2, sum)
+  pos_cf=mean(apply(pos[,(colnames(pos) %in% controls)], 2, sum))/apply(pos, 2, sum)
   mat_poscf = t(t(samples)*pos_cf)
   
   #normalize by column/Sample
-  geomean_cfcol =mean(apply(mat_poscf[,(colnames(mat_poscf) %in% controls)], 2, gm_mean))/apply(mat_poscf[,controls], 2, gm_mean)
+  geomean_cfcol =mean(apply(mat_poscf[,(colnames(mat_poscf) %in% controls)], 2, gm_mean))/apply(mat_poscf, 2, gm_mean)
   mat_gmcf = t(t(mat_poscf)*geomean_cfcol)
   
   #get mouse and rabbit antibody background
@@ -145,70 +145,68 @@ rb = c(setdiff(rownames(raw_data$samples), mm))
 
 norm_dat = geomean_norm(samples = raw_data$samples, controls = controls, pos = raw_data$pos, mm, rb)
 
-outfile_name = gsub("_rawdata.txt", "", input_file)
+outfile_dir = dirname(normalizePath(input_file))
 
-write.xlsx(norm_dat, file =paste0(outfile_name,"_NORMALIZED.xlsx"), rowNames=TRUE)
-
-
-mzmat = melt(norm_dat$residual)
-mzmat$key = paste0(mzmat$Var1, mzmat$Var2)
+write.xlsx(norm_dat, file =paste0(outfile_dir, "/normalized.xlsx"), rowNames=TRUE)
 
 
-mz_ci = data.frame(mzmat[,c("Var1", "Var2")], 
-                   value = mzmat$value)
+# mzmat = melt(norm_dat$residual)
+# mzmat$key = paste0(mzmat$Var1, mzmat$Var2)
+# 
+# 
+# mz_ci = data.frame(mzmat[,c("Var1", "Var2")], 
+#                    value = mzmat$value)
+# 
+# mz_ci$Var2 = factor(mz_ci$Var2, levels=unique(sort(as.character(mz_ci$Var2))))
+# 
+# #for coloring because this color scheme is lame but requested by chris
+# z_rescale = c(min(mz_ci$value), quantile(mz_ci$value, probs = 0.25), 0, quantile(mz_ci$value, probs = 0.25), max(mz_ci$value))
+# z_color = (z_rescale - range(z_rescale)[1]) / diff(range(z_rescale)) * diff(c(0,1)) + c(0,1)[1]
+# pmzmat = ggplot(mz_ci, aes(Var2, Var1)) +
+#   geom_tile(aes(fill = value), colour="white") +
+#   geom_text(aes(label = round(value, 2)), size=3, colour="white") +
+#   #scale_fill_gradient2(low = "green", mid = "black", high = "red", midpoint = 0, guide = "legend")
+#   scale_fill_gradientn(colours=(colorRampPalette( c("green", "black", "red"))(5)),
+#                        values= z_color, limits=c(min(mz_ci$value),max(mz_ci$value))) +
+#   labs(y="Antibody", y="Sample", 
+#        title=paste0(gsub(".txt", "", tail(unlist(strsplit(split="/", x=input_file)), n=1)), ":\nResidual from Mean of Ab")) +
+#   theme(panel.background = element_rect(fill = "white"),
+#         panel.grid.major=element_line(colour="gray"),
+#         plot.title = element_text(hjust = 0.5, vjust=0),
+#         legend.text=element_text(size=8),
+#         legend.position="right",
+#         axis.text.x = element_text(angle=90,hjust = 1, size=10, colour="black"),
+#         axis.text.y = element_text(size=10, colour="black"))
+# 
+# 
+# #migg
+# migg = melt(norm_dat$igg_geosamp_corrected)
+# migg$key = paste0(migg$Var1, migg$Var2)
+# miggup = melt(norm_dat$igg_geosamp_corrected_up)
+# miggup$key = paste0(miggup$Var1, miggup$Var2)
+# miggdown = melt(norm_dat$igg_geosamp_corrected_down)
+# miggdown$key = paste0(miggdown$Var1, miggdown$Var2)
+# 
+# migg_ci = data.frame(migg[,c("Var1", "Var2")], 
+#                    lower = miggdown[match(migg$key, miggdown$key),"value"], 
+#                    upper = miggup[match(migg$key, miggup$key),"value"], 
+#                    value = migg$value)
+# migg_ci$id = paste0(round(migg_ci$lower, 1),",",round(migg_ci$value, 1),",",round(migg_ci$upper, 1))
+# migg_ci$Var2 = factor(migg_ci$Var2, levels=unique(sort(as.character(migg_ci$Var2))))
+# 
+# pm_migg= ggplot(migg_ci, aes(Var2, Var1)) +
+#   geom_tile(aes(fill = value), colour="black") +
+#   geom_text(aes(label = id), size=1.7, colour="black") +
+#   scale_fill_gradientn(colours=(colorRampPalette( c("green", "black", "red"))(10))) +
+#   labs(y="Antibody", y="Sample",
+#        title=paste0(gsub(".txt", "", tail(unlist(strsplit(split="/", x=input_file)), n=1)), ":\n Normalized Confidence Interval")) +
+#   theme(panel.background = element_rect(fill = "white"),
+#         panel.grid.major=element_line(colour="gray"),
+#         plot.title = element_text(hjust = 0.5, vjust=0),
+#         legend.text=element_text(size=8),
+#         legend.position="bottom",
+#         axis.text.x = element_text(angle=90,hjust = 1, size=8, colour="black"),
+#         axis.text.y = element_text(size=8, colour="black"))
 
-mz_ci$Var2 = factor(mz_ci$Var2, levels=unique(sort(as.character(mz_ci$Var2))))
-
-#for coloring because this color scheme is lame but requested by chris
-z_rescale = c(min(mz_ci$value), quantile(mz_ci$value, probs = 0.25), 0, quantile(mz_ci$value, probs = 0.25), max(mz_ci$value))
-z_color = (z_rescale - range(z_rescale)[1]) / diff(range(z_rescale)) * diff(c(0,1)) + c(0,1)[1]
-pmzmat = ggplot(mz_ci, aes(Var2, Var1)) +
-  geom_tile(aes(fill = value), colour="white") +
-  geom_text(aes(label = round(value, 2)), size=3, colour="white") +
-  #scale_fill_gradient2(low = "green", mid = "black", high = "red", midpoint = 0, guide = "legend")
-  scale_fill_gradientn(colours=(colorRampPalette( c("green", "black", "red"))(5)),
-                       values= z_color, limits=c(min(mz_ci$value),max(mz_ci$value))) +
-  labs(y="Antibody", y="Sample", 
-       title=paste0(gsub(".txt", "", tail(unlist(strsplit(split="/", x=input_file)), n=1)), ":\nResidual from Mean of Ab")) +
-  theme(panel.background = element_rect(fill = "white"),
-        panel.grid.major=element_line(colour="gray"),
-        plot.title = element_text(hjust = 0.5, vjust=0),
-        legend.text=element_text(size=8),
-        legend.position="right",
-        axis.text.x = element_text(angle=90,hjust = 1, size=10, colour="black"),
-        axis.text.y = element_text(size=10, colour="black"))
-
-
-#migg
-migg = melt(norm_dat$igg_geosamp_corrected)
-migg$key = paste0(migg$Var1, migg$Var2)
-miggup = melt(norm_dat$igg_geosamp_corrected_up)
-miggup$key = paste0(miggup$Var1, miggup$Var2)
-miggdown = melt(norm_dat$igg_geosamp_corrected_down)
-miggdown$key = paste0(miggdown$Var1, miggdown$Var2)
-
-migg_ci = data.frame(migg[,c("Var1", "Var2")], 
-                   lower = miggdown[match(migg$key, miggdown$key),"value"], 
-                   upper = miggup[match(migg$key, miggup$key),"value"], 
-                   value = migg$value)
-migg_ci$id = paste0(round(migg_ci$lower, 1),",",round(migg_ci$value, 1),",",round(migg_ci$upper, 1))
-migg_ci$Var2 = factor(migg_ci$Var2, levels=unique(sort(as.character(migg_ci$Var2))))
-
-pm_migg= ggplot(migg_ci, aes(Var2, Var1)) +
-  geom_tile(aes(fill = value), colour="black") +
-  geom_text(aes(label = id), size=1.7, colour="black") +
-  scale_fill_gradientn(colours=(colorRampPalette( c("green", "black", "red"))(10))) +
-  labs(y="Antibody", y="Sample",
-       title=paste0(gsub(".txt", "", tail(unlist(strsplit(split="/", x=input_file)), n=1)), ":\n Normalized Confidence Interval")) +
-  theme(panel.background = element_rect(fill = "white"),
-        panel.grid.major=element_line(colour="gray"),
-        plot.title = element_text(hjust = 0.5, vjust=0),
-        legend.text=element_text(size=8),
-        legend.position="bottom",
-        axis.text.x = element_text(angle=90,hjust = 1, size=8, colour="black"),
-        axis.text.y = element_text(size=8, colour="black"))
-
-#ggsave(filename = paste0(outfile_name, "_residual_HEATMAP.png"), plot=pmzmat,width = 11, height = 8.5)
-#ggsave(filename = paste0(outfile_name, "_normalized_HEATMAP_CI.png"), plot=pm_migg,width = 11, height = 7)
-
-
+# #ggsave(filename = paste0(outfile_name, "_residual_HEATMAP.png"), plot=pmzmat,width = 11, height = 8.5)
+# #ggsave(filename = paste0(outfile_name, "_normalized_HEATMAP_CI.png"), plot=pm_migg,width = 11, height = 7)

@@ -2,7 +2,7 @@
 args = commandArgs(trailingOnly=TRUE)
 
 usage = "
-./ruv_mbc.R input_NORMALIZED.xlsx validation_file validation_md
+./ruv_mbc.R NORMALIZED.xlsx validation_file validation_md
 
 input_file= NORMALIZED.xlsx. Will look for igg_geosamp_corrected sheet. 
 validation_file = txt file of validation data normalized
@@ -18,8 +18,8 @@ if (argsLen == 3) {
   print(paste0("Processing ", input_file))
 } else if (argsLen == 1) {
   input_file = args[1]
-  validation_file = "/Users/patterja/Box Sync/NANOSTRING/REFERENCE_FILES/ALLvalidation_samples_corrected.txt"
-  validation_md = "/Users/patterja/Box Sync/NANOSTRING/VALIDATION/ALL_validation_samples.xlsx"
+  validation_file = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/ALL_validation_samples_normalized.txt"
+  validation_md = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/ALL_validation_samples.xlsx"
 } else {
   stop(cat(usage))
 }
@@ -59,9 +59,6 @@ omitregex = paste0(paste0("^", omit), collapse = "|")
 
 #VALIDATION DATA
 
-#validation_file = "/Users/patterja/Box Sync/NANOSTRING/REFERENCE_FILES/ALLvalidation_samples_normalized.txt"
-#validation_md = "/Users/patterja/Box Sync/NANOSTRING/VALIDATION/ALL_validation_samples.xlsx"
-
 mbc_md = read.xlsx(file= validation_md, sheetName = "MBC")
 igg_geosamp = read.csv(validation_file, sep= "\t", row.names = 1)
 igg_geosamp = igg_geosamp[!grepl(omitregex, rownames(igg_geosamp)),]
@@ -91,14 +88,12 @@ validation_stats = data.frame(
 #NEW BATCH
 #input_file =  "/Users/patterja/Box Sync/NANOSTRING/data/20190530_208420541020_SMMART7/20190530_208420541020_ST-05302019-KD0001_OUTPUT/20190530_208420541020_ST-05302019-KD0001_NORMALIZED.xlsx"
 
-new_batch = read.xlsx(file= input_file, sheetName = "igg_geosamp_corrected")
-row.names(new_batch) = as.character(new_batch[,1])
-new_batch = new_batch[,-1]
-
+new_batch = data.matrix(read.xlsx2(file = input_file, sheetName = "igg_geosamp_corrected", 
+                                   row.names=1, stringsAsFactors=F))
 
 #QC OUPUT
 
-ctl_newbatch = melt(as.matrix(log2(new_batch[,make.names(controls)]+1)))
+ctl_newbatch = melt(log2(new_batch[,make.names(controls)])+1)
 
 ctl_newbatch$ctl_probe = paste0(gsub("\\.1$", "", sapply(strsplit(as.character(ctl_newbatch$Var2), split = "_"), tail,1)), 
                                "_", make.names(ctl_newbatch$Var1))
@@ -113,8 +108,45 @@ ctl_validation$status = ifelse(ctl_validation$new_batch < ctl_validation$mean.mi
 
 
 batch_name = tail(unlist(strsplit(dirname(normalizePath(input_file)), "/")),2)[1]
-write.table(ctl_validation, file = paste0(dirname(normalizePath(input_file)), "/", batch_name, "_QC_CONTROLS.csv"), 
+write.table(ctl_validation, file = paste0(dirname(normalizePath(input_file)), "/", 
+                                          batch_name, "_QC_CONTROLS.csv"), 
             sep=",", quote = F, row.names = T, col.names = NA)
+
+
+#~ Comparing newQC with old QC 
+#simple linear regression analysis
+
+
+#~ Function
+ggplotRegression <- function (fit) {
+  ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) +
+    geom_point() +
+    stat_smooth(method = "lm", col = "red") +
+    labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
+                       "Intercept =",signif(fit$coef[[1]],5 ),
+                       " Slope =",signif(fit$coef[[2]], 5),
+                       " P =",signif(summary(fit)$coef[2,4], 5)))
+}
+
+# y=(melt(x[,c(1,2,4,5)]))
+# y$name = paste0(y$X1, y$variable)
+# 
+# hmp = ggplot(y, aes(name, X2)) +
+#   geom_tile(aes(fill = value), colour="black") +
+#   scale_fill_gradientn(colours=(colorRampPalette( c("green", "black", "red"))(10))) +
+#   labs(y="Antibody", y="Sample",
+#        title="Mean of all Validation \nlog2(igg_geosamp_corrected)")+
+#   theme(panel.background = element_rect(fill = "white"),
+#         panel.grid.major=element_line(colour="gray"),
+#         plot.title = element_text(hjust = 0.5, vjust=0),
+#         legend.text=element_text(size=8),
+#         legend.position="bottom",
+#         axis.text.x = element_text(angle=90,hjust = 1, size=8, colour="black"),
+#         axis.text.y = element_text(size=8, colour="black"))
+# 
+# ggsave(filename =paste0(dirname(normalizePath(input_file)),"_residual_HEATMAP.png"), 
+#        plot=hmp,width = 11, height = 8.5)
+
 
 
 #~ DATASET FOR RUV
@@ -136,7 +168,8 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
   
   
   #~ replicated matrix 
-  repdf = data.frame(samp = c(gsub("\\.1$", "", sapply(strsplit(as.character(colnames(mbcctl)), split = "_"), tail,1)),
+  repdf = data.frame(samp = c(gsub("\\.1$", "", sapply(strsplit(as.character(colnames(mbcctl)), 
+                                                                split = "_"), tail,1)),
                               colnames(newsampctl)),
                      batch = c(unlist(lapply(as.character(colnames(mbcctl)), function(x) substring(x, 0,29))),
                                rep(batch_name, length(colnames(newsampctl)))), 
@@ -200,7 +233,7 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
   #~ boxplot of MBC
   bp_mbcruv =ggplot(data.frame(mbcruv.m), aes(Var1, as.numeric(value))) +
     geom_boxplot() +
-    geom_point(data=new_ruv, mapping=aes(y=value),  colour=c("red"), shape=8, size=2) +
+    geom_point(data=new_ruv, mapping=aes(y=value),  colour=c("red", "blue"), shape=8, size=2) +
     coord_flip() +
     labs(x="Antibody", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="RUVnormalized") +
     theme(panel.background = element_rect(fill = "white"),

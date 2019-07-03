@@ -62,21 +62,23 @@ pcaplt <- function (mat, title = "PCA Plot", repdf) {
 
 
 samps2ruv = read.csv(file= ruv_sheet, sep="\t", stringsAsFactors = F)
-files = as.character(unique(samps2ruv$Normalized.file.name))
 sampname = gsub("_samplesheet.txt", "", basename(ruv_sheet))
 
 allbatch_norms = data.frame()
 
-for (f in 1:length(files)){
-  file_name = list.files(path = data_dir,pattern = as.character(files[f]), recursive = T)
-  batch_name = unlist(strsplit(file_name, "/"))[1]
+for (f in 1:length(unique(samps2ruv$Batch))){
+  file_name = as.character(paste0(data_dir,samps2ruv$Batch[f] ,"/OUTPUT/normalized.xlsx"))
   #get normalized data
-  batch = read.xlsx2(file= paste0(data_dir, file_name), sheetName = "igg_geosamp_corrected",stringsAsFactors=F)
-  rownames(batch) = batch[,1]
-  batch[,1] = NULL
-  #get only ruv samples
-  sel_batch = batch[,c(grep(ctrlregex, colnames(batch)), which(colnames(batch) %in% make.names(samps2ruv$Sample.Name)))]
-  md = data.frame("batch"=batch_name, "sample" = colnames(sel_batch), "fullname" = paste0(batch_name,"_", colnames(sel_batch)))
+  batch = read.xlsx(file = file_name, sheetName = "igg_geosamp_corrected",stringsAsFactors=F, row.names=1)
+  batch_name = samps2ruv$Batch[f]
+  
+  #get only samples you want to ruv and controls
+  sel_batch = batch[,c(grep(ctrlregex, colnames(batch)),
+                       which(colnames(batch) %in% make.names(samps2ruv$Sample.Name)))]
+  
+  md = data.frame("batch"=batch_name, 
+                  "sample" = colnames(sel_batch), 
+                  "fullname" = paste0(batch_name,"_", colnames(sel_batch)))
   colnames(sel_batch) = paste0(batch_name,"_", colnames(sel_batch))
   
   if (f==1){
@@ -190,8 +192,9 @@ mbcruv.m$cellline = factor(gsub("\\.1$", "", sapply(strsplit(as.character(mbcruv
 bp_mbcruv = ggplot(data.frame(mbcruv.m), aes(Var1, as.numeric(value))) +
   geom_boxplot() +
   geom_point(data=sampsruv.m, mapping=aes(y=value, colour=Var2),shape=8, size=2) +
+  scale_color_manual(values=c('red', 'blue')) +
   coord_flip() +
-  labs(x="Antibody", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="RUVnormalized") +
+  labs(x="Antibody", title=paste0(sampname,  "\n within Distribution of Metastatic Breast Cancers"),y="RUVnormalized") +
   theme(panel.background = element_rect(fill = "white"),
         panel.grid.major=element_line(colour="gray"),
         plot.title = element_text(hjust = 0.5, vjust=0),
@@ -243,7 +246,7 @@ dev.off()
 ggsave(file=paste0(dirname(normalizePath(ruv_sheet)), "/", sampname, "_MBC.png"), bp_mbcruv, width = 8, height = 6)
 
 ggsave(file=paste0(dirname(normalizePath(ruv_sheet)), "/", sampname, "_controls_norm_RLE.png"), 
-       rle_orig, width = 5, height = 4.5)
+       rle_orig, width = 9, height = 4.5)
 ggsave(file=paste0(dirname(normalizePath(ruv_sheet)), "/", sampname, "_controls_norm_PCA.png"), 
        pca_orig, width = 8, height = 7)
 ggsave(file=paste0(dirname(normalizePath(ruv_sheet)), "/", sampname, "_controls_RUV_RLE.png"), 
