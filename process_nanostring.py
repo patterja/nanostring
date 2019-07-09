@@ -51,18 +51,15 @@ def parseRCC(rcc_file):
         root = ET.fromstring(complete_xml)
         for child in root:
             dict_rcc[child.tag] = child.text
-
         counts = [line.strip().split(',') for line in dict_rcc['Code_Summary'].strip().split('\n')]
         header = [line.strip().split(',') for line in dict_rcc['Header'].strip().split('\n')]
         samp_attrib = [line.strip().split(',') for line in
                        dict_rcc['Sample_Attributes'].strip().split('\n')]
         lane_attrib = [line.strip().split(',') for line in
                        dict_rcc['Lane_Attributes'].strip().split('\n')]
-
         dfcounts = pandas.DataFrame(counts[1:len(counts)], columns=counts[0])
         df_samp_attrib = pandas.DataFrame(header, samp_attrib).T
         df_lane_attrib = pandas.DataFrame(lane_attrib[1:len(lane_attrib)], columns=lane_attrib[0])
-
     return(dfcounts, df_samp_attrib, df_lane_attrib)
 
 def parse_Ab_ref(abfile):
@@ -74,7 +71,7 @@ def parse_Ab_ref(abfile):
         dict
     Examples:
     """
-    ab_name ={}
+    ab_name = {}
     for line in abfile:
         if not line.lstrip().startswith('#'):
             items = line.strip().split(",")
@@ -99,7 +96,6 @@ def parse_samplesheet(samplesheet):
     return(ss_dict)
 
 def main():
-
     args = supply_args()
     if len(args.rcc_files) < 12:
         lrcc = len(args.rcc_files)
@@ -117,11 +113,10 @@ def main():
             #get sample number
             samp_number = re.sub(".RCC", "", file.split("_")[-1])
             dfrcc, df_samp_attrib, df_lane_attrib = parseRCC(file)
-
+            #samp_number = df_lane_attrib.columns[1]
             #rename column name with sample id
             dfrcc.rename(columns={'Count': sampleid[file]}, inplace=True)
             rcc_counts_dict[sampleid[file]] = dfrcc
-
             #df_lane_attrib.rename(columns={df_lane_attrib.columns[1]: sampleid[file]}, inplace=True)
             df_lane_attrib = df_lane_attrib.append(pandas.Series(['SampleName', sampleid[file]],
                                             index=df_lane_attrib.columns),ignore_index=True)
