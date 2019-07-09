@@ -27,7 +27,7 @@ import copy
 VERSION="1.0.0"
 
 #Global variables for norm_geomean
-controls = ["MCF7","HCC1954","BT474","HeyA8","MDA468 control","MDA468+EGF"]
+controls = ["MCF7","HCC1954","BT474","HeyA8","MDA468 control","MDA468control", "MDA468+EGF"]
 mouseAb = ["Ki-67", "Pan-Keratin", "S6 Ribosomal", "p53", "MmAb-IgG1"]
 
 #make the control help statement for norm geomean ctrl input
@@ -108,9 +108,11 @@ def parse_samplesheet(samplesheet):
     """
     ss_dict = {}
     with samplesheet:
+        count = 0
         for line in samplesheet:
             items = line.strip().split("\t")
-            ss_dict[items[0]] = items[1]
+            ss_dict[count] = items[1]
+            count += 1
     return(ss_dict)
 
 
@@ -365,11 +367,11 @@ def main():
     for file in args.rcc_files:
         if file.endswith(".RCC"):
             #get sample number
-            samp_number = re.sub(".RCC", "", file.split("_")[-1])
+            #samp_number = re.sub(".RCC", "", file.split("_")[-1])
             dfrcc, df_samp_attrib, df_lane_attrib = parseRCC(file)
-
+            samp_number = df_lane_atrib[ID]
             #rename column name with sample id
-            dfrcc.rename(columns={'Count': sampleid[file]}, inplace=True)
+            dfrcc.rename(columns={'Count': sampleid[samp_number]}, inplace=True)
             rcc_counts_dict[sampleid[file]] = dfrcc
 
             #df_lane_attrib.rename(columns={df_lane_attrib.columns[1]: sampleid[file]}, inplace=True)
@@ -379,7 +381,7 @@ def main():
 
             samp_attrib_dict[sampleid[file]] = df_samp_attrib
 
-            batch_name=re.sub(r'_%s+.RCC' % samp_number, "", file)
+            #batch_name=re.sub(r'_%s+.RCC' % samp_number, "", file)
 
     #merge dictionary of dataframes together
     raw_data = reduce(lambda x, y: pandas.merge(x, y, on=['CodeClass', 'Name', 'Accession']),
