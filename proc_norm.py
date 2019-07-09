@@ -23,6 +23,7 @@ import xml.etree.ElementTree as ET
 import math
 import csv
 import copy
+from functools import reduce
 
 VERSION="1.0.0"
 
@@ -142,7 +143,7 @@ def get_output(input_file):
         dict with keys: pos, neg and samples. Values are two dimensional arrays.
     """
     #read in the file. separator is a \t 
-    with open(input_file, 'rb') as raw_file:
+    with open(input_file, 'r') as raw_file:
         reader = csv.reader(raw_file, delimiter="\t")
         file_array = []
         for row in reader:
@@ -329,22 +330,22 @@ def run_norm_geomean(input_file, ctrl):
     #write the normalized data to a csv file with the name ending in _NORMALIZED.tsv
         
     normfile_name = "ERCC_NORMALIZED.tsv"
-    with open(normfile_name, 'wb') as csvfile:
+    with open(normfile_name, 'w') as csvfile:
         norm_writer_1 = csv.writer(csvfile, delimiter="\t")
         norm_writer_1.writerows(norm_dat[0])
     
     normfile_name = "GEOMEAN_NORMALIZED.tsv"
-    with open(normfile_name, 'wb') as csvfile:
+    with open(normfile_name, 'w') as csvfile:
         norm_writer_2 = csv.writer(csvfile, delimiter="\t")
         norm_writer_2.writerows(norm_dat[1])
         
     normfile_name = "IGG_NORMALIZED.tsv"
-    with open(normfile_name, 'wb') as csvfile:
+    with open(normfile_name, 'w') as csvfile:
         norm_writer_2 = csv.writer(csvfile, delimiter="\t")
         norm_writer_2.writerows(norm_dat[2])
         
     normfile_name = "LOG_2_NORMALIZED.tsv"
-    with open(normfile_name, 'wb') as csvfile:
+    with open(normfile_name, 'w') as csvfile:
         norm_writer = csv.writer(csvfile, delimiter="\t")
         norm_writer.writerows(norm_dat[3])
 
@@ -412,16 +413,24 @@ def main():
     raw_data.to_csv(outputDir + "/rawdata.txt", sep='\t', index=False)
 
     #test to see if samp_attribs are all the same
-    for v in range(len(samp_attrib_dict.values()) - 1):
-        if samp_attrib_dict.values()[v].equals(samp_attrib_dict.values()[v+1]) != True:
+    #for v in range(len(samp_attrib_dict.values()) - 1):
+    last_value = None
+    first = True
+    for value in samp_attrib_dict.values():
+        if first:
+            last_value = value
+            first = False
+            with open(outputDir + "/run_metrics.txt", 'w') as met:
+                met.write(value.to_csv(sep="\t"))
+                met.write(lane_attrib.to_csv(sep="\t"))
+        #if samp_attrib_dict.values()[v].equals(samp_attrib_dict.values()[v+1]) != True:
+        if value.equals(last_value) != True:
             print("Samples are not from one batch. Sample Attributes differ")
             print(samp_attrib_dict.keys()[v])
         else:
             print("Samples are from one batch. OK")
-
-    with open(outputDir + "/run_metrics.txt", 'w') as met:
-        met.write(samp_attrib_dict.values()[0].to_csv(sep="\t"))
-        met.write(lane_attrib.to_csv(sep="\t"))
+        last_value = value
+    
         
 
     #run the norm_geomean
