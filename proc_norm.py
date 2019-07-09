@@ -358,6 +358,7 @@ def main():
         print("Only ", lrcc, " RCC files specified!\nContinuing with ", lrcc, " files.")
 
     sampleid = parse_samplesheet(args.samplesheet)
+    print(sampleid)
 
     rcc_counts_dict = {}
     samp_attrib_dict = {}
@@ -369,17 +370,17 @@ def main():
             #get sample number
             #samp_number = re.sub(".RCC", "", file.split("_")[-1])
             dfrcc, df_samp_attrib, df_lane_attrib = parseRCC(file)
-            samp_number = df_lane_atrib[ID]
+            samp_number = int(df_lane_attrib.columns[1])
             #rename column name with sample id
             dfrcc.rename(columns={'Count': sampleid[samp_number]}, inplace=True)
-            rcc_counts_dict[sampleid[file]] = dfrcc
+            rcc_counts_dict[sampleid[samp_number]] = dfrcc
 
             #df_lane_attrib.rename(columns={df_lane_attrib.columns[1]: sampleid[file]}, inplace=True)
-            df_lane_attrib = df_lane_attrib.append(pandas.Series(['SampleName', sampleid[file]],
+            df_lane_attrib = df_lane_attrib.append(pandas.Series(['SampleName', sampleid[samp_number]],
                                             index=df_lane_attrib.columns),ignore_index=True)
             lane_attrib_dict[df_lane_attrib.columns[1]] = df_lane_attrib
 
-            samp_attrib_dict[sampleid[file]] = df_samp_attrib
+            samp_attrib_dict[sampleid[samp_number]] = df_samp_attrib
 
             #batch_name=re.sub(r'_%s+.RCC' % samp_number, "", file)
 
