@@ -1,8 +1,14 @@
 <tool id='process_nanostring' name='Process and Normalize RCC Files' version='1.0.0'>
     <description>Process and normalize RCC output from nanostring.</description>    
     <command detect_errors="exit_code"><![CDATA[
+        
+        #for $num, $file in enumerate($rcc)
+                    ln -s $file input${num}.RCC &&
+        #end for
         python $__tool_directory__/proc_norm.py 
-          "${rcc}" 
+        #for $num, $file in enumerate($rcc)
+            input${num}.RCC
+        #end for
           --samplesheet "${samplesheet}"
           --abfile "${ab_reference}"
         #if $ctrl
