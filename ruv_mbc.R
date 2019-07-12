@@ -6,7 +6,7 @@ usage = "
 
 input_file= normalized.tsv Will look for igg_geosamp_corrected sheet. 
 validation_file = txt file of validation data normalized
-validation_md =txt with metastatic breast cancer list. 
+include_bad_Ab = FALSE
 "
 
 
@@ -14,14 +14,17 @@ argsLen <- length(args);
 if (argsLen == 3) {
   input_file = args[1]
   validation_file = args[2]
-  validation_md = args[3]
- 
+  include_bad_Ab = args[3]
   print(paste0("Processing ", input_file))
-} else if (argsLen == 1) {
+  } else if (argsLen == 2) {
   input_file = args[1]
-  validation_file = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/validation_samples_normalized.txt"
-  validation_md = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/validation_mbc_metadata.txt"
-} else {
+  validation_file = args[2]
+  include_bad_Ab = FALSE
+  } else if (argsLen == 1) {
+  input_file = args[1]
+  validation_file = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/validation_mbc_normalized.txt"
+  include_bad_Ab = FALSE
+  } else {
   stop(cat(usage))
 }
 
@@ -36,8 +39,6 @@ library(reshape2)
 #Things to include and exclue
 controls=c("MCF7","HCC1954","BT474","HeyA8","MDA468 control","MDA468+EGF")
 ctrlregex = gsub("\\+", "\\\\+", paste0(paste0(controls, collapse = "|"),"|", "MDA468"))
-omit = c("Histone H3", "S6", "RbAb-IgG", "MmAb-IgG1", "p-TSC2", "TSC2")
-omitregex = paste0(paste0("^", omit), collapse = "|")
 
 #~ PLOTTING FUNCTIONS
 pcaplt <- function (mat, title = "PCA Plot", repdf) {
@@ -61,13 +62,19 @@ pcaplt <- function (mat, title = "PCA Plot", repdf) {
 }
 
 #VALIDATION DATA
-
-mbc_md = read.table(file= validation_md, sep="\t", header=T)
 igg_geosamp = read.csv(validation_file, sep= "\t", row.names = 1)
-igg_geosamp = igg_geosamp[!grepl(omitregex, rownames(igg_geosamp)),]
+
+if (include_bad_Ab){
+  print("keeping all antibodies: IgG and antibodies that did not perform well or did not have dynamic range")
+} else {
+  omit = c("Histone H3", "S6", "RbAb-IgG", "MmAb-IgG1", "p-TSC2", "TSC2")
+  omitregex = paste0(paste0("^", omit), collapse = "|")
+  igg_geosamp = igg_geosamp[!grepl(omitregex, rownames(igg_geosamp)),]
+  
+}
 #PROCESS VALIDATION DATA
 ctl_norm = igg_geosamp[,grepl(ctrlregex, colnames(igg_geosamp))]
-mbc_norm = igg_geosamp[,make.names(as.character(mbc_md$Combined_Name))]
+mbc_norm = igg_geosamp[,!grepl(ctrlregex, colnames(igg_geosamp))]
 lctl_norm.m = melt(as.matrix(log2(ctl_norm+1)))
 lctl_norm.m$ctl_probe = paste0(gsub("\\.1$", "", sapply(strsplit(as.character(lctl_norm.m$Var2), split = "_"), tail,1)), 
                                "_", make.names(lctl_norm.m$Var1))
@@ -190,7 +197,7 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
   
   #~ split these apart makes plotting easier
   #ctl_ruv already assigned before graphing
-  mbc_ruv = t(RUVcorrected)[,make.names(as.character(mbc_md$Combined_Name))]
+  mbc_ruv = t(RUVcorrected)[,make.names(as.character(colnames(mbc_norm)))]
   new_ruv = data.frame("Var1" = rownames(t(RUVcorrected)),
                        "Var2"= samp,
                        "value" = t(RUVcorrected)[rownames(t(RUVcorrected)), samp])
@@ -212,7 +219,7 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
 
   bp_mbcruv =ggplot(data.frame(mbcruv.m), aes(Var1, as.numeric(value))) +
     geom_boxplot() +
-    geom_point(data=new_ruv, mapping=aes(x=Var1, y=value), colour=boxpl_colours, shape=8, size=2) +
+    geom_point(data=new_ruv, mapping=aes(x=Var1, y=value), colour=c('red'), shape=8, size=2) +
     coord_flip() +
     labs(x="Antibody", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="RUVnormalized") +
     theme(panel.background = element_rect(fill = "white"),
