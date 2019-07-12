@@ -19,8 +19,8 @@ if (argsLen ==1){
 } else if (argsLen ==2) {
   data_dir = args[1]
   ruv_sheet = args[2]
-  validation_file = "/Users/patterja/Box Sync/NANOSTRING/REFERENCE_FILES/ALL_validation_samples_normalized.txt"
-  validation_md ="/Users/patterja/Box Sync/NANOSTRING/REFERENCE_FILES/ALL_validation_samples.xlsx"
+  validation_file = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/validation_samples_normalized.txt"
+  validation_md = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/validation_mbc_metadata.txt"
   print(paste0("Processing ", ruv_sheet))
 } else {
   stop(cat(usage))
@@ -67,9 +67,9 @@ sampname = gsub("_samplesheet.txt", "", basename(ruv_sheet))
 allbatch_norms = data.frame()
 
 for (f in 1:length(unique(samps2ruv$Batch))){
-  file_name = as.character(paste0(data_dir,samps2ruv$Batch[f] ,"/OUTPUT/normalized.xlsx"))
+  file_name = as.character(paste0(data_dir,samps2ruv$Batch[f] ,"/OUTPUT/IGG_NORMALIZED.tsv"))
   #get normalized data
-  batch = read.xlsx(file = file_name, sheetName = "igg_geosamp_corrected",stringsAsFactors=F, row.names=1)
+  batch = read.table(file = file_name, sep="\t",stringsAsFactors=F, row.names=1, header=T)
   batch_name = samps2ruv$Batch[f]
   
   #get only samples you want to ruv and controls
@@ -92,11 +92,9 @@ for (f in 1:length(unique(samps2ruv$Batch))){
 }
 
 
-#VALIDATION DATA
+#VALIDATION DATA #MBC
 
-#validation_file = "/Users/patterja/Box Sync/NANOSTRING/REFERENCE_FILES/ALL_validation_samples_normalized.txt"
-#validation_md = "/Users/patterja/Box Sync/NANOSTRING/REFERENCE_FILES/ALL_validation_samples.xlsx"
-mbc_md = read.xlsx(file= validation_md, sheetName = "MBC")
+mbc_md = read.table(file= validation_md, sep="\t", header=T)
 igg_geosamp = read.csv(validation_file, sep= "\t", row.names = 1)
 igg_geosamp = igg_geosamp[!grepl(omitregex, rownames(igg_geosamp)),]
 #PROCESS VALIDATION DATA
@@ -107,10 +105,6 @@ lctl_norm.m$ctl_probe = paste0(gsub("\\.1$", "", sapply(strsplit(as.character(lc
                                "_", make.names(lctl_norm.m$Var1))
 lctl_norm.m$cellline = factor(gsub("\\.1$", "", sapply(strsplit(as.character(lctl_norm.m$Var2), split = "_"), tail,1)))
 
-#MBC
-mbc_md = read.xlsx(file= validation_md, sheetName = "MBC")
-igg_geosamp = read.csv(validation_file, sep= "\t", row.names = 1)
-igg_geosamp = igg_geosamp[!grepl(omitregex, rownames(igg_geosamp)),]
 
 # - mbc filtered from metadata sheet only, excludes some samples in igg_geosamp
 mbcctl = cbind(ctl_norm, mbc_norm[match(rownames(ctl_norm), rownames(mbc_norm)),])
@@ -187,6 +181,8 @@ sampsruv.m = melt(samps_ruv, id.vars=row.names)
 mbcruv.m$ctl_probe = paste0(gsub("\\.1$", "", sapply(strsplit(as.character(mbcruv.m$Var2), split = "_"), tail,1)), 
                             "_", make.names(mbcruv.m$Var1))
 mbcruv.m$cellline = factor(gsub("\\.1$", "", sapply(strsplit(as.character(mbcruv.m$Var2), split = "_"), tail,1)))
+
+
 
 #~ boxplot of MBC
 bp_mbcruv = ggplot(data.frame(mbcruv.m), aes(Var1, as.numeric(value))) +

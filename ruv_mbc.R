@@ -4,10 +4,11 @@ args = commandArgs(trailingOnly=TRUE)
 usage = "
 ./ruv_mbc.R NORMALIZED.xlsx validation_file validation_md
 
-input_file= NORMALIZED.xlsx. Will look for igg_geosamp_corrected sheet. 
+input_file= normalized.tsv Will look for igg_geosamp_corrected sheet. 
 validation_file = txt file of validation data normalized
-validation_md =xlsx with metastatic breast cancer list. 
+validation_md =txt with metastatic breast cancer list. 
 "
+
 
 argsLen <- length(args);
 if (argsLen == 3) {
@@ -18,8 +19,8 @@ if (argsLen == 3) {
   print(paste0("Processing ", input_file))
 } else if (argsLen == 1) {
   input_file = args[1]
-  validation_file = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/ALL_validation_samples_normalized.txt"
-  validation_md = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/ALL_validation_samples.xlsx"
+  validation_file = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/validation_samples_normalized.txt"
+  validation_md = "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/validation_mbc_metadata.txt"
 } else {
   stop(cat(usage))
 }
@@ -31,6 +32,14 @@ library(ruv)
 library(ggplot2)
 library(reshape2)
 
+
+#Things to include and exclue
+controls=c("MCF7","HCC1954","BT474","HeyA8","MDA468 control","MDA468+EGF")
+ctrlregex = gsub("\\+", "\\\\+", paste0(paste0(controls, collapse = "|"),"|", "MDA468"))
+omit = c("Histone H3", "S6", "RbAb-IgG", "MmAb-IgG1", "p-TSC2", "TSC2")
+omitregex = paste0(paste0("^", omit), collapse = "|")
+
+#~ PLOTTING FUNCTIONS
 pcaplt <- function (mat, title = "PCA Plot", repdf) {
   var = mat[apply(mat, 1, var, na.rm = TRUE) != 0, ]
   cc.var = var[complete.cases(var), ]
@@ -50,16 +59,10 @@ pcaplt <- function (mat, title = "PCA Plot", repdf) {
           legend.text = element_text(size = 4), legend.position = "right")
   return(p)
 }
-#Things to include and exclue
-controls=c("MCF7","HCC1954","BT474","HeyA8","MDA468 control","MDA468+EGF")
-ctrlregex = gsub("\\+", "\\\\+", paste0(paste0(controls, collapse = "|"),"|", "MDA468"))
-omit = c("Histone H3", "S6", "RbAb-IgG", "MmAb-IgG1", "p-TSC2", "TSC2")
-omitregex = paste0(paste0("^", omit), collapse = "|")
-
 
 #VALIDATION DATA
 
-mbc_md = read.xlsx(file= validation_md, sheetName = "MBC")
+mbc_md = read.table(file= validation_md, sep="\t", header=T)
 igg_geosamp = read.csv(validation_file, sep= "\t", row.names = 1)
 igg_geosamp = igg_geosamp[!grepl(omitregex, rownames(igg_geosamp)),]
 #PROCESS VALIDATION DATA
@@ -86,13 +89,9 @@ validation_stats = data.frame(
 
 #INPUT NEW FILE
 #NEW BATCH
-#input_file =  "/Users/patterja/Box Sync/NANOSTRING/data/20190530_208420541020_SMMART7/20190530_208420541020_ST-05302019-KD0001_OUTPUT/20190530_208420541020_ST-05302019-KD0001_NORMALIZED.xlsx"
-
-new_batch = data.matrix(read.xlsx2(file = input_file, sheetName = "igg_geosamp_corrected", 
-                                   row.names=1, stringsAsFactors=F))
+new_batch = data.matrix(read.table(file = input_file, sep="\t", row.names=1, stringsAsFactors=F, header=T))
 
 #QC OUPUT
-
 ctl_newbatch = melt(log2(new_batch[,make.names(controls)])+1)
 
 ctl_newbatch$ctl_probe = paste0(gsub("\\.1$", "", sapply(strsplit(as.character(ctl_newbatch$Var2), split = "_"), tail,1)), 
@@ -107,45 +106,30 @@ ctl_validation$status = ifelse(ctl_validation$new_batch < ctl_validation$mean.mi
                                       ctl_validation$new_batch - ctl_validation$mean.plus.2sd, "PASS"))
 
 
-batch_name = tail(unlist(strsplit(dirname(normalizePath(input_file)), "/")),2)[1]
-write.table(ctl_validation, file = paste0(dirname(normalizePath(input_file)), "/", 
-                                          batch_name, "_QC_CONTROLS.csv"), 
-            sep=",", quote = F, row.names = T, col.names = NA)
+write.table(ctl_validation, file = paste0(dirname(normalizePath(input_file)), "/", "qc_controls.tsv"), 
+            sep="\t", quote = F, row.names = T, col.names = NA)
 
 
 #~ Comparing newQC with old QC 
 #simple linear regression analysis
 
 
-#~ Function
-ggplotRegression <- function (fit) {
-  ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) +
-    geom_point() +
-    stat_smooth(method = "lm", col = "red") +
-    labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
-                       "Intercept =",signif(fit$coef[[1]],5 ),
-                       " Slope =",signif(fit$coef[[2]], 5),
-                       " P =",signif(summary(fit)$coef[2,4], 5)))
-}
+lmfitqc = lm(new_batch ~ mean, data=ctl_validation)
 
-# y=(melt(x[,c(1,2,4,5)]))
-# y$name = paste0(y$X1, y$variable)
-# 
-# hmp = ggplot(y, aes(name, X2)) +
-#   geom_tile(aes(fill = value), colour="black") +
-#   scale_fill_gradientn(colours=(colorRampPalette( c("green", "black", "red"))(10))) +
-#   labs(y="Antibody", y="Sample",
-#        title="Mean of all Validation \nlog2(igg_geosamp_corrected)")+
-#   theme(panel.background = element_rect(fill = "white"),
-#         panel.grid.major=element_line(colour="gray"),
-#         plot.title = element_text(hjust = 0.5, vjust=0),
-#         legend.text=element_text(size=8),
-#         legend.position="bottom",
-#         axis.text.x = element_text(angle=90,hjust = 1, size=8, colour="black"),
-#         axis.text.y = element_text(size=8, colour="black"))
-# 
-# ggsave(filename =paste0(dirname(normalizePath(input_file)),"_residual_HEATMAP.png"), 
-#        plot=hmp,width = 11, height = 8.5)
+#~ plot linear model
+
+ggReg = ggplot(lmfitqc$model, aes_string(x = names(lmfitqc$model)[2], y = names(lmfitqc$model)[1])) +
+  geom_point() +
+  stat_smooth(method = "lm", col = "red") +
+  labs(title = paste("Antibody Agreement: point per cell line per antibody",
+                     "\nCorrelation= ",signif(cor((lmfitqc$model)[1],(lmfitqc$model)[2]), 5),
+                     "\nAdj R2= ",signif(summary(lmfitqc)$adj.r.squared, 5),
+                     "\nIntercept=",signif(lmfitqc$coef[[1]],5),
+                     " p=",signif(summary(lmfitqc)$coef[1,4], 5),
+                     "\nSlope=",signif(lmfitqc$coef[[2]], 5),
+                     " p=",signif(summary(lmfitqc)$coef[2,4], 5)), 
+       x="mean of validation samples")
+
 
 
 
@@ -154,8 +138,6 @@ ggplotRegression <- function (fit) {
 # - mbc filtered from metadata sheet only, excludes some samples in igg_geosamp
 mbcctl = cbind(ctl_norm, mbc_norm[match(rownames(ctl_norm), rownames(mbc_norm)),])
 dir.create(file.path(paste0(dirname(normalizePath(input_file)), "/ruv_figures")))
-
-
 
 #for sample in newbatch
 mbc_percentile=data.frame(row.names = rownames(igg_geosamp))
@@ -169,10 +151,9 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
   
   #~ replicated matrix 
   repdf = data.frame(samp = c(gsub("\\.1$", "", sapply(strsplit(as.character(colnames(mbcctl)), 
-                                                                split = "_"), tail,1)),
-                              colnames(newsampctl)),
+                                                                split = "_"), tail,1)),colnames(newsampctl)),
                      batch = c(unlist(lapply(as.character(colnames(mbcctl)), function(x) substring(x, 0,29))),
-                               rep(batch_name, length(colnames(newsampctl)))), 
+                               rep("new_batch", length(colnames(newsampctl)))), 
                      sampcolumn = c(colnames(mbcctl), colnames(newsampctl)))
   repmat = replicate.matrix(c(make.names(repdf[,1])))
   
@@ -188,13 +169,11 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
     labs(colour = "batch") +
     geom_hline(yintercept = 0, 
                linetype = "dotted", colour = "cyan") + 
-    ggtitle(paste0("Relative Log Expression \nNormalized Data (IGG corrected) \n", batch_name, "_", samp))
-  
-  pca_orig = pcaplt(lctls, title = paste0("log2 (Normalized Signal + 1)\n", batch_name, "_", samp), repdf)
+    ggtitle(paste0("Relative Log Expression \nNormalized Data (IGG corrected) \n",  samp))
+  pca_orig = pcaplt(lctls, title = paste0("log2 (Normalized Signal + 1)\n", samp), repdf)
   
   #~ RUV
   RUVcorrected = RUVIII(Y=t(log2(combined_norm +1)), ctl=c(1:nrow(combined_norm)), M=repmat, k=1)
-  
   #~ plotting RUV processed figures
   ctl_ruv = t(RUVcorrected)[,grep(ctrlregex, colnames(t(RUVcorrected)))]
   rle_ruv = ruv_rle(Y = RUVcorrected[grep(ctrlregex, rownames(RUVcorrected)),], 
@@ -206,9 +185,8 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
     labs(colour = "batch") +
     geom_hline(yintercept = 0, 
                linetype = "dotted", colour = "cyan") + 
-    ggtitle(paste0("Relative Log Expression RUV processed\n", batch_name, "_", samp))
-  
-  pca_ruv = pcaplt(ctl_ruv, title = paste0("RUV Processed\n", batch_name, "_", samp), repdf)
+    ggtitle(paste0("Relative Log Expression RUV processed\n", samp))
+  pca_ruv = pcaplt(ctl_ruv, title = paste0("RUV Processed\n", samp), repdf)
   
   #~ split these apart makes plotting easier
   #ctl_ruv already assigned before graphing
@@ -230,10 +208,11 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
   mbcruv.m$cellline = factor(gsub("\\.1$", "", sapply(strsplit(as.character(mbcruv.m$Var2), split = "_"), tail,1)))
   
 
-  #~ boxplot of MBC
+#~ boxplot of MBC
+
   bp_mbcruv =ggplot(data.frame(mbcruv.m), aes(Var1, as.numeric(value))) +
     geom_boxplot() +
-    geom_point(data=new_ruv, mapping=aes(y=value),  colour=c("red", "blue"), shape=8, size=2) +
+    geom_point(data=new_ruv, mapping=aes(x=Var1, y=value), colour=boxpl_colours, shape=8, size=2) +
     coord_flip() +
     labs(x="Antibody", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="RUVnormalized") +
     theme(panel.background = element_rect(fill = "white"),
@@ -243,25 +222,28 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
           legend.position="right",
           axis.text.x = element_text(hjust = 1, size=7, colour="black"),
           axis.text.y = element_text(size=6, colour="black"))
-  
+  print("saving plots")
   #~ save all plots
-  ggsave(file=paste0(dirname(normalizePath(input_file)), "/",samp, "_", batch_name, "_MBC.png"), bp_mbcruv, width = 8, height = 4)
-  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_", batch_name, "_controls_norm_RLE.png"), 
-         rle_orig, width = 9, height = 4.5)
-  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_", batch_name, "_controls_norm_PCA.png"), 
-         pca_orig, width = 8, height = 7)
-  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_", batch_name, "_controls_RUV_RLE.png"), 
-         rle_ruv, width = 9, height = 4.5)
-  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_", batch_name, "_controls_RUV_PCA.png"), 
-         pca_ruv, width = 8, height = 7)
+  ggsave(file=paste0(dirname(normalizePath(input_file)), "/",samp, "_MBC.pdf"), bp_mbcruv, device="pdf", width = 8, height = 4)
+  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_controls_norm_RLE.pdf"), 
+         device="pdf", rle_orig, width = 9, height = 4.5)
+  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_controls_norm_PCA.pdf"), 
+         device="pdf", pca_orig, width = 8, height = 7)
+  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_controls_RUV_RLE.pdf"), 
+         device="pdf", rle_ruv, width = 9, height = 4.5)
+  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_controls_RUV_PCA.pdf"), 
+         device="pdf", pca_ruv, width = 8, height = 7)
   
   
-  write.table(x = t(RUVcorrected), file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_", batch_name, "_RUVcorrected.csv"), 
-              sep=",", quote = F, row.names = T, col.names = NA)
+  write.table(x = t(RUVcorrected), file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_RUVcorrected.tsv"), 
+              sep="\t", quote = F, row.names = T, col.names = NA)
 }
+print("saving QC plot")
 
+ggsave(filename =paste0(dirname(normalizePath(input_file)),"/QC_antibody_plot.pdf"), 
+       device = "pdf", plot=ggReg,width = 8, height = 8)
 
-write.table(x = round(mbc_percentile, 2), file=paste0(dirname(normalizePath(input_file)), "/", batch_name, "_MBCpercentile.csv"), sep=",", quote = F, row.names = T, col.names = NA)
+write.table(x = round(mbc_percentile, 2), file=paste0(dirname(normalizePath(input_file)), "/", "MBC_percentiles.tsv"), sep="\t", quote = F, row.names = T, col.names = NA)
 
 
   
