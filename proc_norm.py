@@ -329,22 +329,22 @@ def run_norm_geomean(input_file, ctrl):
     
     #write the normalized data to a csv file with the name ending in _NORMALIZED.tsv
         
-    normfile_name = "ERCC_NORMALIZED.tsv"
+    normfile_name = "1_ERCC_NORMALIZED.tsv"
     with open(normfile_name, 'w') as csvfile:
         norm_writer_1 = csv.writer(csvfile, delimiter="\t")
         norm_writer_1.writerows(norm_dat[0])
     
-    normfile_name = "GEOMEAN_NORMALIZED.tsv"
+    normfile_name = "2_GEOMEAN_NORMALIZED.tsv"
     with open(normfile_name, 'w') as csvfile:
         norm_writer_2 = csv.writer(csvfile, delimiter="\t")
         norm_writer_2.writerows(norm_dat[1])
         
-    normfile_name = "IGG_NORMALIZED.tsv"
+    normfile_name = "3_IGG_NORMALIZED.tsv"
     with open(normfile_name, 'w') as csvfile:
         norm_writer_2 = csv.writer(csvfile, delimiter="\t")
         norm_writer_2.writerows(norm_dat[2])
         
-    normfile_name = "LOG_2_NORMALIZED.tsv"
+    normfile_name = "4_LOG_2_NORMALIZED.tsv"
     with open(normfile_name, 'w') as csvfile:
         norm_writer = csv.writer(csvfile, delimiter="\t")
         norm_writer.writerows(norm_dat[3])
@@ -365,7 +365,8 @@ def main():
     samp_attrib_dict = {}
     lane_attrib_dict = {}
 
-    rcc_dir = os.path.dirname(args.rcc_files[1])
+    outputDir = os.path.dirname(os.path.abspath(args.rcc_files[1]))
+
     for file in args.rcc_files:
         if file.endswith(".RCC"):
             #get sample number
@@ -392,13 +393,6 @@ def main():
     lane_attrib = reduce(lambda x, y: pandas.merge(x, y, on=['ID']),
                          lane_attrib_dict.values())
 
-    outputDir = os.path.join(rcc_dir + "OUTPUT")
-
-    try:
-        os.mkdir(outputDir)
-    except OSError as e:
-        if e.errno != 17:
-            raise
 
 
     # Change long name to something else if necessary
@@ -413,7 +407,6 @@ def main():
     raw_data.to_csv(outputDir + "/rawdata.txt", sep='\t', index=False)
 
     #test to see if samp_attribs are all the same
-    #for v in range(len(samp_attrib_dict.values()) - 1):
     last_value = None
     first = True
     for value in samp_attrib_dict.values():
