@@ -17,9 +17,9 @@
     ]]></command>
     
     <inputs>
-    <param type="data" name="samplesheet" label="Samplesheet" help="Samplesheet is tab delimited of RCC file name in column 1 and sample name in column 2."/>
-        <param type="data" name="rcc" label="RCC Files (reporter code count)" multiple="true" help=""/>
-        <param type="data" name="ab_reference" label="ANTIBODY_REFERENCE.csv" optional="true" help="antibody_reference file changes antibody names from the existing ones in RCC files"/>
+        <param format="tabular" type="data" name="samplesheet" label="Samplesheet" help="Samplesheet is tab delimited of RCC file name in column 1 and sample name in column 2."/>
+        <param format="xml" type="data" name="rcc" label="RCC Files (reporter code count)" multiple="true" help=""/>
+        <param format="data" type="data" name="ab_reference" label="ANTIBODY_REFERENCE.csv" optional="true" help="antibody_reference file changes antibody names from the existing ones in RCC files"/>
         <param type="boolean" name="ctrl" label="Normalize using all samples" help="YES = Normalize using all RCC samples.  NO = Normalize only using cell lines MCF7, HCC1954, BT474, HeyA8, MDA468 control, MDA468control, MDA468+EGF as controls"/>
     </inputs>
     <outputs>

@@ -1,15 +1,23 @@
 #!/usr/bin/env Rscript
+
+##
+## QC metrics, RUV and comparison with MBC cohort 
+##
+library(ruv)
+library(ggplot2)
+library(reshape2)
+
+## ARGS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 args = commandArgs(trailingOnly=TRUE)
 
 usage = "
 ./ruv_mbc.R NORMALIZED.xlsx validation_file validation_md
 
-input_file= normalized.tsv Will look for igg_geosamp_corrected sheet. 
-validation_file = txt file of validation data normalized
-include_bad_Ab = FALSE
+input_file= PATH TO normalized.tsv Will look for igg_geosamp_corrected sheet. 
+validation_file = PATH TO TSV file of validation data normalized
+include_bad_Ab = <TRUE/FALSE> = include all antibodies, poor performing low dynamic range, IgG or only validated
 "
-
-
 argsLen <- length(args);
 if (argsLen == 3) {
   input_file = args[1]
@@ -29,18 +37,13 @@ if (argsLen == 3) {
 }
 
 
-
-library(xlsx)
-library(ruv)
-library(ggplot2)
-library(reshape2)
-
+## CONTROLS ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #Things to include and exclue
 controls=c("MCF7","HCC1954","BT474","HeyA8","MDA468 control","MDA468+EGF")
 ctrlregex = gsub("\\+", "\\\\+", paste0(paste0(controls, collapse = "|"),"|", "MDA468"))
 
-#~ PLOTTING FUNCTIONS
+## FUNCTIONS ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 pcaplt <- function (mat, title = "PCA Plot", repdf) {
   var = mat[apply(mat, 1, var, na.rm = TRUE) != 0, ]
   cc.var = var[complete.cases(var), ]
@@ -50,18 +53,25 @@ pcaplt <- function (mat, title = "PCA Plot", repdf) {
   labs <- sapply(seq_along(perc), function(i) {
     paste("PC ", i, " (", round(perc[i], 2), "%)", sep = "")})
   
-  PCsmd = cbind(PC1_and_PC2, repdf[match(rownames(PC1_and_PC2), repdf$sampcolumn), c("samp", "batch")])
+  PCsmd = cbind(PC1_and_PC2, repdf[match(rownames(PC1_and_PC2), repdf$sampcolumn), 
+                                   c("samp", "batch")])
   p = ggplot(PCsmd,aes_string("PC1", "PC2", col="batch")) + 
     geom_point(size = 1.5) + 
     geom_text(aes(label = type), vjust = -1, size=2) + 
     labs(title = title,x = labs[1], y = labs[2]) + 
     theme(panel.background = element_rect(fill = "white"),
-          panel.grid.major = element_line(colour = "gray"), plot.title = element_text(hjust = 0.5), 
+          panel.grid.major = element_line(colour = "gray"), 
+          plot.title = element_text(hjust = 0.5), 
           legend.text = element_text(size = 4), legend.position = "right")
   return(p)
 }
+## OUTPUT PREP ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#VALIDATION DATA
+dir.create(paste0(dirname(normalizePath(input_file)), "/OUTPUT"), showWarnings = F)
+output_dir = paste0(dirname(normalizePath(input_file)), "/OUTPUT")
+dir.create(file.path(paste0(dirname(normalizePath(input_file)), "/OUTPUT/ruv_figures")), showWarnings = F)
+
+## VALIDATION DATA ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 igg_geosamp = read.csv(validation_file, sep= "\t", row.names = 1)
 
 if (include_bad_Ab){
@@ -94,7 +104,7 @@ validation_stats = data.frame(
     2*(tapply(lctl_norm.m$value, lctl_norm.m$ctl_probe, sd)))
 
 
-#INPUT NEW FILE
+## INPUT FILE ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #NEW BATCH
 new_batch = data.matrix(read.table(file = input_file, sep="\t", row.names=1, stringsAsFactors=F, header=T))
 
@@ -113,10 +123,10 @@ ctl_validation$status = ifelse(ctl_validation$new_batch < ctl_validation$mean.mi
                                       ctl_validation$new_batch - ctl_validation$mean.plus.2sd, "PASS"))
 
 
-write.table(ctl_validation, file = paste0(dirname(normalizePath(input_file)), "/", "qc_controls.tsv"), 
+write.table(ctl_validation, file = paste0(output_dir, "/", "qc_controls.tsv"), 
             sep="\t", quote = F, row.names = T, col.names = NA)
 
-
+## QC LINEAR MODEL ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ Comparing newQC with old QC 
 #simple linear regression analysis
 
@@ -140,11 +150,10 @@ ggReg = ggplot(lmfitqc$model, aes_string(x = names(lmfitqc$model)[2], y = names(
 
 
 
-#~ DATASET FOR RUV
+## RUV DATASET ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 # - mbc filtered from metadata sheet only, excludes some samples in igg_geosamp
 mbcctl = cbind(ctl_norm, mbc_norm[match(rownames(ctl_norm), rownames(mbc_norm)),])
-dir.create(file.path(paste0(dirname(normalizePath(input_file)), "/ruv_figures")))
 
 #for sample in newbatch
 mbc_percentile=data.frame(row.names = rownames(igg_geosamp))
@@ -231,26 +240,26 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
           axis.text.y = element_text(size=6, colour="black"))
   print("saving plots")
   #~ save all plots
-  ggsave(file=paste0(dirname(normalizePath(input_file)), "/",samp, "_MBC.pdf"), bp_mbcruv, device="pdf", width = 8, height = 4)
-  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_controls_norm_RLE.pdf"), 
+  ggsave(file=paste0(output_dir, "/",samp, "_MBC.pdf"), bp_mbcruv, device="pdf", width = 8, height = 4)
+  ggsave(file=paste0(output_dir, "/ruv_figures/",samp, "_controls_norm_RLE.pdf"), 
          device="pdf", rle_orig, width = 9, height = 4.5)
-  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_controls_norm_PCA.pdf"), 
+  ggsave(file=paste0(output_dir, "/ruv_figures/",samp, "_controls_norm_PCA.pdf"), 
          device="pdf", pca_orig, width = 8, height = 7)
-  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_controls_RUV_RLE.pdf"), 
+  ggsave(file=paste0(output_dir, "/ruv_figures/",samp, "_controls_RUV_RLE.pdf"), 
          device="pdf", rle_ruv, width = 9, height = 4.5)
-  ggsave(file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_controls_RUV_PCA.pdf"), 
+  ggsave(file=paste0(output_dir, "/ruv_figures/",samp, "_controls_RUV_PCA.pdf"), 
          device="pdf", pca_ruv, width = 8, height = 7)
   
   
-  write.table(x = t(RUVcorrected), file=paste0(dirname(normalizePath(input_file)), "/ruv_figures/",samp, "_RUVcorrected.tsv"), 
+  write.table(x = t(RUVcorrected), file=paste0(output_dir, "/ruv_figures/",samp, "_RUVcorrected.tsv"), 
               sep="\t", quote = F, row.names = T, col.names = NA)
 }
 print("saving QC plot")
 
-ggsave(filename =paste0(dirname(normalizePath(input_file)),"/QC_antibody_plot.pdf"), 
+ggsave(filename =paste0(output_dir,"/QC_antibody_plot.pdf"), 
        device = "pdf", plot=ggReg,width = 8, height = 8)
 
-write.table(x = round(mbc_percentile, 2), file=paste0(dirname(normalizePath(input_file)), "/", "MBC_percentiles.tsv"), sep="\t", quote = F, row.names = T, col.names = NA)
+write.table(x = round(mbc_percentile, 2), file=paste0(output_dir, "/", "MBC_percentiles.tsv"), sep="\t", quote = F, row.names = T, col.names = NA)
 
 
   

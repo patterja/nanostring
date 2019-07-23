@@ -15,7 +15,6 @@ argsLen <- length(args);
 if (argsLen ==1){
   cat("need ruv sheet")
   stop(cat(usage))
-  
 } else if (argsLen ==2) {
   data_dir = args[1]
   ruv_sheet = args[2]
@@ -57,7 +56,6 @@ pcaplt <- function (mat, title = "PCA Plot", repdf) {
           panel.grid.major = element_line(colour = "gray"), plot.title = element_text(hjust = 0.5), 
           legend.text = element_text(size = 4), legend.position = "right")
   return(p)
-  
 }
 
 
