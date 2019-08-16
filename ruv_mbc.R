@@ -67,10 +67,11 @@ pcaplt <- function (mat, title = "PCA Plot", repdf) {
 }
 ## OUTPUT PREP ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-dir.create(paste0(dirname(normalizePath(input_file)), "/OUTPUT"), showWarnings = F)
-output_dir = paste0(dirname(normalizePath(input_file)), "/OUTPUT")
-dir.create(file.path(paste0(dirname(normalizePath(input_file)), "/OUTPUT/ruv_figures")), showWarnings = F)
-
+#dir.create(paste0(dirname(normalizePath(input_file)), "/OUTPUT"), showWarnings = F)
+#output_dir = paste0(dirname(normalizePath(input_file)), "/OUTPUT")
+output_dir = "."
+#dir.create(file.path(paste0(dirname(normalizePath(input_file)), "/OUTPUT/ruv_figures")), showWarnings = F)
+dir.create("ruv_figures", showWarnings = F)
 ## VALIDATION DATA ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 igg_geosamp = read.csv(validation_file, sep= "\t", row.names = 1)
 
@@ -229,6 +230,7 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
   bp_mbcruv =ggplot(data.frame(mbcruv.m), aes(Var1, as.numeric(value))) +
     geom_boxplot() +
     geom_point(data=new_ruv, mapping=aes(x=Var1, y=value), colour=c('red'), shape=8, size=2) +
+    scale_x_discrete(labels=paste0(rownames(new_ruv)," (",round(mbc_percentile[rownames(new_ruv),samp]*100,0),")")) +
     coord_flip() +
     labs(x="Antibody", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="RUVnormalized") +
     theme(panel.background = element_rect(fill = "white"),
