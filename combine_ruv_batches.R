@@ -65,7 +65,7 @@ sampname = gsub("_samplesheet.txt", "", basename(ruv_sheet))
 allbatch_norms = data.frame()
 
 for (f in 1:length(unique(samps2ruv$Batch))){
-  file_name = as.character(paste0(data_dir,samps2ruv$Batch[f] ,"/OUTPUT/IGG_NORMALIZED.tsv"))
+  file_name = as.character(paste0(data_dir,samps2ruv$Batch[f] ,"/OUTPUT/3_IGG_NORMALIZED.tsv"))
   #get normalized data
   batch = read.table(file = file_name, sep="\t",stringsAsFactors=F, row.names=1, header=T)
   batch_name = samps2ruv$Batch[f]
