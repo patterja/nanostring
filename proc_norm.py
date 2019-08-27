@@ -19,7 +19,6 @@ import re
 import argparse
 import pandas
 import xml.etree.ElementTree as ET
-#norm_geomean import statements
 import math
 import csv
 import copy
@@ -29,12 +28,10 @@ VERSION="1.0.0"
 
 #Global variables for norm_geomean
 controls = ["MCF7","HCC1954","BT474","HeyA8","MDA468 control","MDA468control", "MDA468+EGF"]
-mouseAb = ["Ki-67", "Pan-Keratin", "S6 Ribosomal", "p53", "MmAb-IgG1"]
 
 #make the control help statement for norm geomean ctrl input
-control_help = "Marks all samples to be used as control. Otherwise controls are "
-for sample in controls:
-    control_help += sample
+control_help = "Marks all samples to be used as control. Otherwise controls are "+ ",".join([str(i) for i in controls])
+
 
 def supply_args():
     """
@@ -48,7 +45,7 @@ def supply_args():
                         help='ANTIBODY_REFERENCE.csv')
     parser.add_argument('--version', action='version', version='%(prog)s ' + VERSION)
     #For norm_geomean
-    parser.add_argument('-ctrl', action="store_true", help=control_help)
+    parser.add_argument('-ctrl', action="store_true", default=False, help=control_help)
     args = parser.parse_args()
     return args
 
@@ -91,11 +88,17 @@ def parse_Ab_ref(abfile):
     Examples:
     """
     ab_name ={}
+    mouseAb = []
+    rabbitAb =[]
     for line in abfile:
         if not line.lstrip().startswith('#'):
             items = line.strip().split(",")
             ab_name[items[1]] = items[0]
-    return(ab_name)
+            if items[4] == "mouse":
+                mouseAb.append(items[0])
+            else:
+                rabbitAb.append(items[0])
+    return(ab_name, rabbitAb, mouseAb)
 
 def parse_samplesheet(samplesheet):
     """
@@ -191,22 +194,22 @@ def get_output(input_file):
     
             
 #geomean norm
-def geomean_norm(samples, controls, pos, mm, rb):
+def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
     """Normalizes the data
     Args:
         samples: two dimensional samples matrix from get_output
         controls: list of control samples
         pos: two dimensinal pos matrix from get_output
-        mm: list of mouse antibodies
-        rb: list of rabbit antibodies
+        mouseAb: list of mouse antibodies
+        rabbitAb: list of rabbit antibodies
     returns:
         list: list of four two dimensional arrays from after each of the three normalization steps and the log step.
     """
     #samples are matrix of sampls from get_output
     #controls are list of control names (columns) based on the ctrl_flag
     #pos is matrix of positive controls, formatted like the sample matrix
-    #mm is a list of mouse antibodies
-    #rb is a list of rabbit antibodies
+    #mouseAb is a list of mouse antibodies
+    #rabbitAb is a list of rabbit antibodies
     
     num_controls = 0.0
     sum_of_sums = 0.0
@@ -270,16 +273,15 @@ def geomean_norm(samples, controls, pos, mm, rb):
         elif row[0].strip() == "RbAb-IgG":
             rabbit_igg_index = count
         count += 1
-        
-        
+
     for sample_index in range(1, len(samples[0])):
         mouse_igg = samples[mouse_igg_index][sample_index]
         rabbit_igg = samples[rabbit_igg_index][sample_index]
         
         for row in samples:
-            if row[0].strip() in mm:
+            if row[0].strip() in mouseAb:
                 row[sample_index] = row[sample_index]/mouse_igg
-            elif row[0].strip() in rb:
+            elif row[0].strip() in rabbitAb:
                 row[sample_index] = row[sample_index]/rabbit_igg
                 
     samples_3 = copy.deepcopy(samples)
@@ -295,7 +297,7 @@ def geomean_norm(samples, controls, pos, mm, rb):
     output_list = [samples_1, samples_2, samples_3, samples]            
     return output_list
 
-def run_norm_geomean(input_file, ctrl):
+def run_norm_geomean(input_file, ctrl, controls, mouseAb, rabbitAb):
     """Runs the entire norm geomean process from the raw data file to writing the normalized output files.
     Args:
         input_file: the raw data file output from the processing steps
@@ -306,23 +308,15 @@ def run_norm_geomean(input_file, ctrl):
     #process the input file
     raw_data = get_output(input_file)
     #set controls
-    global controls
+
     if ctrl:
         #set controls to all the samples
         controls = raw_data["samples"][0][1:]
-        
-    #set the mm to all the rows that are from the mouseAb list
-    #set the rb to all the other rows
-    mm = []
-    rb = []
-    for row in raw_data["samples"]:
-        if row[0] in mouseAb:
-            mm.append(row[0])
-        elif row[0] != "Name":
-            rb.append(row[0])
-    
+    else:
+        controls
+
     #get the normalized data
-    norm_dat = geomean_norm(raw_data["samples"], controls, raw_data["pos"], mm, rb)
+    norm_dat = geomean_norm(raw_data["samples"], controls, raw_data["pos"], mouseAb, rabbitAb)
     
     #get the prefix for the name for the output file
     outfile_name = input_file.split('_rawdata')[0]
@@ -393,12 +387,10 @@ def main():
     lane_attrib = reduce(lambda x, y: pandas.merge(x, y, on=['ID']),
                          lane_attrib_dict.values())
 
-
-
     # Change long name to something else if necessary
     if args.abfile:
         with args.abfile:
-            ab_name = parse_Ab_ref(args.abfile)
+            ab_name, rabbitAb, mouseAb = parse_Ab_ref(args.abfile)
         for name in raw_data["Name"].iteritems():
             if not re.search("POS|NEG", name[1]):
                 #print(name)
@@ -419,16 +411,14 @@ def main():
         #if samp_attrib_dict.values()[v].equals(samp_attrib_dict.values()[v+1]) != True:
         if value.equals(last_value) != True:
             print("Samples are not from one batch. Sample Attributes differ")
-            print(samp_attrib_dict.keys()[v])
         else:
             print("Samples are from one batch. OK")
         last_value = value
-    
-        
+
 
     #run the norm_geomean
     raw_data_file = outputDir + "/rawdata.txt"
-    run_norm_geomean(raw_data_file, args.ctrl)
+    run_norm_geomean(raw_data_file, args.ctrl, controls, mouseAb, rabbitAb)
 
 if __name__ == "__main__":
     main()
