@@ -317,7 +317,6 @@ def run_norm_geomean(input_file, ctrl, controls, mouseAb, rabbitAb):
 
     #get the normalized data
     norm_dat = geomean_norm(raw_data["samples"], controls, raw_data["pos"], mouseAb, rabbitAb)
-    
     #get the prefix for the name for the output file
     outfile_name = input_file.split('_rawdata')[0]
     
