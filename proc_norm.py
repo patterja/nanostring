@@ -40,7 +40,7 @@ def supply_args():
     parser = argparse.ArgumentParser(description='Nanostring output RCC readouts (html format) and '
                                                  'converts to raw data tsv')
     parser.add_argument('rcc_files', type=str, nargs='+', help='raw RCC files')
-    parser.add_argument('--samplesheet', type=argparse.FileType('r'), help='samplesheet.txt')
+    parser.add_argument('--samplesheet', type=str, help='samplesheet.txt')
     parser.add_argument('--abfile', nargs='?', type=argparse.FileType('r'),
                         help='ANTIBODY_REFERENCE.csv')
     parser.add_argument('--version', action='version', version='%(prog)s ' + VERSION)
@@ -111,9 +111,9 @@ def parse_samplesheet(samplesheet):
     Examples:
     """
     ss_dict = {}
-    with samplesheet:
+    with open(samplesheet, 'r') as ss:
         count = 0
-        for line in samplesheet:
+        for line in ss:
             items = line.strip().split("\t")
             ss_dict[count] = items[1]
             count += 1
