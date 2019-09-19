@@ -7,6 +7,8 @@ suppressPackageStartupMessages(library(argparse))
 suppressPackageStartupMessages(library(ruv))
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(reshape2))
+suppressPackageStartupMessages(library(gridExtra))
+
 
 ## ARGS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -114,6 +116,7 @@ lctl_norm.m = melt(lctl_norm)
 lctl_norm.m$Var2 = gsub("\\.1$", "", lctl_norm.m$Var2)
 lctl_norm.m$batch = sapply(strsplit(as.character(lctl_norm.m$Var2), "__"), `[`, 1)
 lctl_norm.m$ctlname = sapply(strsplit(as.character(lctl_norm.m$Var2), "__"), `[`, 2)
+
 lctl_norm.m$ctl_probe = factor(paste0(lctl_norm.m$ctlname,"_", lctl_norm.m$Var1))
 
 
@@ -164,18 +167,29 @@ ggReg = ggplot(lmfitqc$model, aes_string(x = names(lmfitqc$model)[2], y = names(
 
 twosd = 2*sd(ctl_validation$new_batch-ctl_validation$mean)
 outdat =  ctl_validation[which((ctl_validation$new_batch-ctl_validation$mean) < -twosd|(ctl_validation$new_batch-ctl_validation$mean) > twosd),]
-baplot = ggplot(ctl_validation) +
+outdat$cellline = sapply(strsplit(as.character(rownames(outdat)), "_"), `[`, 1)
+outdat$probe = sapply(strsplit(as.character(rownames(outdat)), "_"), `[`, 2)
+
+baplot_ctl = ggplot(ctl_validation) +
   geom_point(aes(x=mean, y=new_batch-mean)) +
   geom_hline(yintercept=c(0, twosd, -twosd), color="red", linetype = 2) +
   geom_text(data=data.frame(x=0,y=c(-twosd, twosd)), aes(x, y), label = c("2SD", "-2SD"), color="red") +
-  geom_text(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,
-                               label=rownames(outdat), hjust=-0.1), size=3) +
+  geom_point(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,color=outdat$cellline)) +
+  #geom_text(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,
+  #                             label=rownames(outdat), hjust=-0.1), size=3) +
+  labs(title = "Mean-Difference Plot: labeled if +/- >2SD", x="Mean of validation batches", y="New Batch - Mean of validation batches")
+
+baplot_ab = ggplot(ctl_validation) +
+  geom_point(aes(x=mean, y=new_batch-mean)) +
+  geom_hline(yintercept=c(0, twosd, -twosd), color="red", linetype = 2) +
+  geom_text(data=data.frame(x=0,y=c(-twosd, twosd)), aes(x, y), label = c("2SD", "-2SD"), color="red") +
+  geom_point(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,color=outdat$probe)) +
   labs(title = "Mean-Difference Plot: labeled if +/- >2SD", x="Mean of validation batches", y="New Batch - Mean of validation batches")
 
 
 print("saving QC plot")
 ggsave(filename =paste0(output_dir,"/QC_antibody_linear_plot.pdf"), device = "pdf", plot=ggReg,width = 8, height = 8)
-ggsave(filename =paste0(output_dir,"/QC_antibody_meandiff_plot.pdf"), device = "pdf", baplot,width = 8, height = 5)
+ggsave(filename =paste0(output_dir,"/QC_antibody_meandiff_plot.pdf"), device = "pdf", grid.arrange(baplot_ab, baplot_ctl),width = 8, height = 5)
 
 
 ## RUV DATASET ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -252,7 +266,7 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
     scale_x_discrete(labels=paste0(as.character(levels(new_ruv$Var1))," (",
                                    round(mbc_percentile[as.character(levels(new_ruv$Var1)), samp]*100,0),")")) +
     coord_flip() +
-    labs(x="Antibody", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="RUVnormalized") +
+    labs(x="Antibody (Percentiles)", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="RUVnormalized") +
     theme(panel.background = element_rect(fill = "white"),
           panel.grid.major=element_line(colour="gray"),
           plot.title = element_text(hjust = 0.5, vjust=0),
