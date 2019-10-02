@@ -26,23 +26,23 @@ from functools import reduce
 
 VERSION="1.0.0"
 
-#Global variables for norm_geomean
-controls = ["MCF7","HCC1954","BT474","HeyA8","MDA468 control","MDA468control", "MDA468+EGF"]
+def define_controls():
+    controls = ["MCF7","HCC1954","BT474","HeyA8","MDA468 control","MDA468control", "MDA468+EGF"]
 
-#make the control help statement for norm geomean ctrl input
-control_help = "Marks all samples to be used as control. Otherwise controls are "+ ",".join([str(i) for i in controls])
-
+    #make the control help statement for norm geomean ctrl input
+    control_help = "Marks all samples to be used as control. Otherwise controls are "+ ",".join([str(i) for i in controls])
+    return(controls, control_help)
 
 def supply_args():
     """
     Input arguments
     """
+    controls, control_help=define_controls()
     parser = argparse.ArgumentParser(description='Nanostring output RCC readouts (html format) and '
                                                  'converts to raw data tsv')
     parser.add_argument('rcc_files', type=str, nargs='+', help='raw RCC files')
     parser.add_argument('--samplesheet', type=str, help='samplesheet.txt')
-    parser.add_argument('--abfile', nargs='?', type=argparse.FileType('r'),
-                        help='ANTIBODY_REFERENCE.csv')
+    parser.add_argument('--abfile', type=argparse.FileType('r'),help='ANTIBODY_REFERENCE.csv')
     parser.add_argument('--version', action='version', version='%(prog)s ' + VERSION)
     #For norm_geomean
     parser.add_argument('-ctrl', action="store_true", default=False, help=control_help)
@@ -137,61 +137,31 @@ def gm_mean(vector):
     g = math.exp(num_sum/len(vector))
     return g
 
-#get output
-def get_output(input_file):
+def df2dictarrays(raw_data):
     """Format the raw data input file into usable arrays of Samples, positive and negative
     Args:
-        input_file: the raw data file
+        rawdata pandas dataframe
     Returns:
         dict with keys: pos, neg and samples. Values are two dimensional arrays.
     """
-    #read in the file. separator is a \t 
-    with open(input_file, 'r') as raw_file:
-        reader = csv.reader(raw_file, delimiter="\t")
-        file_array = []
-        for row in reader:
-            file_array.append(row)
-    #get the name column, by checking for Name in header
-    count = 0
-    name_col = 1
-    for header in file_array[0]:
-        if header.strip() == "Name":
-            name_col = count
-        else:
-            count += 1
-    #get the first sample column by checking for an integer entry
-    sample_col = 3
-    count = 0
-    for entry in file_array[1]:
-        try:
-            num = int(entry)
-            sample_col = count
-            break
-        except ValueError:
-            count += 1
-    
-    #iterate over the array, adding each line to the appropriate new array.
+    # iterate over the dataframe, adding each line to the appropriate new array.
     samples = []
     pos = []
     neg = []
-    header = True
-    for row in file_array:
-        if header:
-            pos.append([row[name_col]] + row[sample_col:])
-            samples.append([row[name_col]] + row[sample_col:])
-            neg.append([row[name_col]] + row[sample_col:])
-            header = False
-        elif "POS" in row[name_col]:
-            pos.append([row[name_col]] + row[sample_col:])
-        elif "NEG" in row[name_col]:
-            neg.append([row[name_col]] + row[sample_col:])
+    pos.append(list(raw_data.columns))
+    samples.append(list(raw_data.columns))
+    neg.append(list(raw_data.columns))
+    for index,row in raw_data.iterrows():
+        if "POS" in row.Name:
+            pos.append(row.to_list())
+        elif "NEG" in row.Name:
+            neg.append(row.to_list())
         else:
-            samples.append([row[name_col]] + row[sample_col:])
-            
-    #samples are a matrix with rows are genes and columns are samples
-    output_dict = {"pos":pos, "neg":neg, "samples":samples}
+            samples.append(row.to_list())
+
+    # samples are a matrix with rows are antibodies and columns are samples
+    output_dict = {"pos": pos, "neg": neg, "samples": samples}
     return output_dict
-    
             
 #geomean norm
 def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
@@ -211,7 +181,7 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
     #mouseAb is a list of mouse antibodies
     #rabbitAb is a list of rabbit antibodies
     
-    num_controls = 0.0
+    #num_controls = 0.0
     sum_of_sums = 0.0
     header = True
     for row in pos:
@@ -236,7 +206,7 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
             
     samples_1 = copy.deepcopy(samples)
     
-    geomeans = []    
+    geomeans = []
     for sample_index in range(1, len(samples[0])):
         if samples[0][sample_index].strip() in controls:
             sample_col = []
@@ -277,19 +247,25 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
     for sample_index in range(1, len(samples[0])):
         mouse_igg = samples[mouse_igg_index][sample_index]
         rabbit_igg = samples[rabbit_igg_index][sample_index]
-        
+
         for row in samples:
             if row[0].strip() in mouseAb:
-                row[sample_index] = row[sample_index]/mouse_igg
+                if row[sample_index]-mouse_igg <= 0:
+                    row[sample_index] = 0
+                else:
+                    row[sample_index] = row[sample_index] - mouse_igg
             elif row[0].strip() in rabbitAb:
-                row[sample_index] = row[sample_index]/rabbit_igg
-                
+                if row[sample_index]-rabbit_igg <= 0:
+                    row[sample_index] = 0
+                else:
+                    row[sample_index] = row[sample_index] - rabbit_igg
+
     samples_3 = copy.deepcopy(samples)
-    
+
     for row in samples:
         for index in range(1, len(samples[0])):
             try:
-                row[index] = math.log(row[index], 2)
+                row[index] = math.log(row[index]+1, 2)
             except TypeError:
                 pass
                 
@@ -297,29 +273,14 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
     output_list = [samples_1, samples_2, samples_3, samples]            
     return output_list
 
-def run_norm_geomean(input_file, ctrl, controls, mouseAb, rabbitAb):
+def write_norms(norm_dat):
     """Runs the entire norm geomean process from the raw data file to writing the normalized output files.
     Args:
-        input_file: the raw data file output from the processing steps
-        ctrl: Boolean indicating whether all samples should be used as controls or just the default ones.
+        #norm_dat: list of 4 arrays
     Returns:
         none
     """
-    #process the input file
-    raw_data = get_output(input_file)
-    #set controls
 
-    if ctrl:
-        #set controls to all the samples
-        controls = raw_data["samples"][0][1:]
-    else:
-        controls
-
-    #get the normalized data
-    norm_dat = geomean_norm(raw_data["samples"], controls, raw_data["pos"], mouseAb, rabbitAb)
-    #get the prefix for the name for the output file
-    outfile_name = input_file.split('_rawdata')[0]
-    
     #write the normalized data to a csv file with the name ending in _NORMALIZED.tsv
         
     normfile_name = "1_ERCC_NORMALIZED.tsv"
@@ -331,8 +292,8 @@ def run_norm_geomean(input_file, ctrl, controls, mouseAb, rabbitAb):
     with open(normfile_name, 'w') as csvfile:
         norm_writer_2 = csv.writer(csvfile, delimiter="\t")
         norm_writer_2.writerows(norm_dat[1])
-        
-    normfile_name = "3_IGG_NORMALIZED.tsv"
+
+    normfile_name = "3_IGG_SUBTRACTED.tsv"
     with open(normfile_name, 'w') as csvfile:
         norm_writer_2 = csv.writer(csvfile, delimiter="\t")
         norm_writer_2.writerows(norm_dat[2])
@@ -345,11 +306,13 @@ def run_norm_geomean(input_file, ctrl, controls, mouseAb, rabbitAb):
 
 
 def main():
+    #avoiding global variables for controls
+    controls, control_help = define_controls()
 
     args = supply_args()
     if len(args.rcc_files) < 12:
         lrcc = len(args.rcc_files)
-        print("Only ", lrcc, " RCC files specified!\nContinuing with ", lrcc, " files.")
+        print("\nOnly "+ str(lrcc) + " RCC files specified!\nContinuing with "+ str(lrcc) + " files.\n")
 
     sampleid = parse_samplesheet(args.samplesheet)
     print(sampleid)
@@ -387,13 +350,14 @@ def main():
                          lane_attrib_dict.values())
 
     # Change long name to something else if necessary
-    if args.abfile:
-        with args.abfile:
-            ab_name, rabbitAb, mouseAb = parse_Ab_ref(args.abfile)
-        for name in raw_data["Name"].iteritems():
-            if not re.search("POS|NEG", name[1]):
-                #print(name)
-                raw_data['Name'][name[0]] = ab_name[name[1].strip().split("|")[0]]
+    with args.abfile:
+        ab_name, rabbitAb, mouseAb = parse_Ab_ref(args.abfile)
+
+    # Write raw data file
+    for name in raw_data["Name"].iteritems():
+        if not re.search("POS|NEG", name[1]):
+            #print(name)
+            raw_data['Name'][name[0]] = ab_name[name[1].strip().split("|")[0]]
 
     raw_data.to_csv(outputDir + "/rawdata.txt", sep='\t', index=False)
 
@@ -407,17 +371,25 @@ def main():
             with open(outputDir + "/run_metrics.txt", 'w') as met:
                 met.write(value.to_csv(sep="\t"))
                 met.write(lane_attrib.to_csv(sep="\t"))
-        #if samp_attrib_dict.values()[v].equals(samp_attrib_dict.values()[v+1]) != True:
         if value.equals(last_value) != True:
             print("Samples are not from one batch. Sample Attributes differ")
         else:
             print("Samples are from one batch. OK")
         last_value = value
 
+    #Prep for dictionary of arrays
+    raw_data_short = raw_data.drop(['CodeClass','Accession'], 1)
+    split_data = df2dictarrays(raw_data_short)
 
-    #run the norm_geomean
-    raw_data_file = outputDir + "/rawdata.txt"
-    run_norm_geomean(raw_data_file, args.ctrl, controls, mouseAb, rabbitAb)
+    # set controls
+    if args.ctrl:
+        # set controls to all the samples
+        controls = split_data["samples"][0][1:]
+    else:
+        controls
+
+    norm_dat = geomean_norm(split_data["samples"], controls, split_data["pos"], mouseAb, rabbitAb)
+    write_norms(norm_dat)
 
 if __name__ == "__main__":
     main()
