@@ -14,7 +14,6 @@
 ## RETURN:
 #   rawdata.txt: tab-sep file with table of Antibody x Sample
 #
-import os
 import re
 import argparse
 import pandas
@@ -27,6 +26,12 @@ from functools import reduce
 VERSION="1.0.0"
 
 def define_controls():
+    """
+        Made this function to avoid incorporating global variables
+        And this may be more complex in the future.
+    Args: no args
+    Return: list of controls, and control help string
+    """
     controls = ["MCF7","HCC1954","BT474","HeyA8","MDA468 control","MDA468control", "MDA468+EGF"]
 
     #make the control help statement for norm geomean ctrl input
@@ -247,7 +252,11 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
     for sample_index in range(1, len(samples[0])):
         mouse_igg = samples[mouse_igg_index][sample_index]
         rabbit_igg = samples[rabbit_igg_index][sample_index]
-
+    #    for row in samples:
+    #        if row[0].strip() in mouseAb:
+    #            row[sample_index] = row[sample_index] / mouse_igg
+    #        elif row[0].strip() in rabbitAb:
+    #            row[sample_index] = row[sample_index] / rabbit_igg
         for row in samples:
             if row[0].strip() in mouseAb:
                 if row[sample_index]-mouse_igg <= 0:
@@ -306,7 +315,7 @@ def write_norms(norm_dat):
 
 
 def main():
-    #avoiding global variables for controls
+    #avoiding global variables for controls and this might get more complicated in the future
     controls, control_help = define_controls()
 
     args = supply_args()
@@ -321,7 +330,7 @@ def main():
     samp_attrib_dict = {}
     lane_attrib_dict = {}
 
-    outputDir = os.path.dirname(os.path.abspath(args.rcc_files[1]))
+    #outputDir = os.path.dirname(os.path.abspath(args.rcc_files[1]))
 
     for file in args.rcc_files:
         if file.endswith(".RCC"):
@@ -359,7 +368,7 @@ def main():
             #print(name)
             raw_data['Name'][name[0]] = ab_name[name[1].strip().split("|")[0]]
 
-    raw_data.to_csv(outputDir + "/rawdata.txt", sep='\t', index=False)
+    raw_data.to_csv("rawdata.txt", sep='\t', index=False)
 
     #test to see if samp_attribs are all the same
     last_value = None
@@ -368,7 +377,7 @@ def main():
         if first:
             last_value = value
             first = False
-            with open(outputDir + "/run_metrics.txt", 'w') as met:
+            with open("run_metrics.txt", 'w') as met:
                 met.write(value.to_csv(sep="\t"))
                 met.write(lane_attrib.to_csv(sep="\t"))
         if value.equals(last_value) != True:
