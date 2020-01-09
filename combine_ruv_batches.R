@@ -76,6 +76,14 @@ for (f in 1:length(unique(samps2ruv$Batch))){
   batch = read.table(file = file_name, sep="\t",stringsAsFactors=F, row.names=1, header=T)
   batch_name = samps2ruv$Batch[f]
   
+  #TEST to see if sample names in batch
+  if(any(colnames(batch) %in% make.names(samps2ruv$Sample.Name))){
+    print(paste0("Sample:", samps2ruv$Sample.Name[f], " in ", file_name))}
+  else{
+    print(paste0("Sample:", samps2ruv$Sample.Name[f], " NOT in ", file_name, "\n Check sample name."))
+    stop()
+    }
+
   #get only samples you want to ruv and controls
   sel_batch = batch[,c(grep(ctrlregex, colnames(batch)),
                        which(colnames(batch) %in% make.names(samps2ruv$Sample.Name)))]
@@ -170,7 +178,7 @@ samp_ruv = t(RUVcorrected)[,combined_md$sampcolumn[combined_md$mbc=="new"]]
 #get samples only, exclude controls. Tricky because some samples have control names. dumb
 idx_controls = which(!combined_md[combined_md$mbc=="new","reps"] %in% make.names(controls))
 samp_ruv = samp_ruv[,idx_controls]
-sampruv.m = melt(samp_ruv,  id.vars=row.names)
+sampruv.m = melt(as.matrix(samp_ruv),  id.vars=row.names)
 
 
 #~ Get percentile using ecdf

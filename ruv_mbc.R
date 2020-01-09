@@ -17,12 +17,12 @@ version="2.0"
 
 
 parser <- ArgumentParser()
-parser$add_argument("-i", help="3_IGG_NORMALIZED.tsv", dest="input_file")
-parser$add_argument("--validation_file", type="character", default="/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/validation_samples_sub_normalized.txt",
+parser$add_argument("-i", help="3_IGG_SUBTRACTED.tsv", dest="input_file")
+parser$add_argument("--validation_file", type="character", default="/Volumes/Histopathology\ Shared\ Resource/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_sub_normalized.txt",
                     dest="validation_file", help="validation file for controls comparison")
-parser$add_argument("--mbc_md_file", type="character", default= "/Users/patterja/Box Sync/NANOSTRING/REFERENCE_FILES/validation_mbc_metadata.txt",
+parser$add_argument("--mbc_md_file", type="character", default= "/Volumes/Histopathology\ Shared\ Resource/CLINICAL/Nanostring/REFERENCE_FILES/validation_mbc_metadata.txt",
                     dest="mbc_md_file", help="metastatic breast cancer metadata file")
-parser$add_argument("--ab_ref_file", type="character", default= "/Users/patterja/Box\ Sync/NANOSTRING/REFERENCE_FILES/ANTIBODY_REFERENCE.csv",
+parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/Histopathology\ Shared\ Resource/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE.csv",
                     dest="ab_ref_file", help="ANTIBODY_REFERENCE.csv")
 parser$add_argument("--include_bad_Ab", action="store_true", default=FALSE,
                     dest="include_bad_Ab", help="include all antibodies")
@@ -170,25 +170,26 @@ ggReg = ggplot(lmfitqc$model, aes_string(x = names(lmfitqc$model)[2], y = names(
        x="mean of validation samples")
 
 twosd = 2*sd(ctl_validation$new_batch-ctl_validation$mean)
-outdat =  ctl_validation[which((ctl_validation$new_batch-ctl_validation$mean) < -twosd|(ctl_validation$new_batch-ctl_validation$mean) > twosd),]
+#outdat =  ctl_validation[which((ctl_validation$new_batch-ctl_validation$mean) < -twosd|(ctl_validation$new_batch-ctl_validation$mean) > twosd),]
+outdat=ctl_validation
 outdat$cellline = sapply(strsplit(as.character(rownames(outdat)), "_"), `[`, 1)
 outdat$probe = sapply(strsplit(as.character(rownames(outdat)), "_"), `[`, 2)
 
-baplot_ctl = ggplot(ctl_validation) +
-  geom_point(aes(x=mean, y=new_batch-mean)) +
+baplot_ctl = ggplot(outdat) +
+  geom_point(aes(x=mean, y=new_batch-mean, color=cellline)) +
   geom_hline(yintercept=c(0, twosd, -twosd), color="red", linetype = 2) +
   geom_text(data=data.frame(x=0,y=c(-twosd, twosd)), aes(x, y), label = c("2SD", "-2SD"), color="red") +
-  geom_point(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,color=outdat$cellline)) +
-  #geom_text(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,
-  #                             label=rownames(outdat), hjust=-0.1), size=3) +
-  labs(title = "Mean-Difference Plot: labeled if +/- >2SD", x="Mean of validation batches", y="New Batch - Mean of validation batches")
+  #geom_point(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,color=outdat$cellline)) +
+  #geom_text(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,label=rownames(outdat), hjust=-0.1), size=3) +
+  labs(title = "Mean-Difference Plot of Celllines", x="Mean of validation batches", y="New Batch - Mean of validation batches")
 
-baplot_ab = ggplot(ctl_validation) +
-  geom_point(aes(x=mean, y=new_batch-mean)) +
+baplot_ab = ggplot(outdat) +
+  geom_point(aes(x=mean, y=new_batch-mean, color=probe)) +
   geom_hline(yintercept=c(0, twosd, -twosd), color="red", linetype = 2) +
   geom_text(data=data.frame(x=0,y=c(-twosd, twosd)), aes(x, y), label = c("2SD", "-2SD"), color="red") +
-  geom_point(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,color=outdat$probe)) +
-  labs(title = "Mean-Difference Plot: labeled if +/- >2SD", x="Mean of validation batches", y="New Batch - Mean of validation batches")
+  #geom_point(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,color=outdat$probe)) +
+  labs(title = "Mean-Difference Plot of Antibodies", x="Mean of validation batches", y="New Batch - Mean of validation batches") +
+  theme(legend.text=element_text(size=4))
 
 
 print("saving QC plot")

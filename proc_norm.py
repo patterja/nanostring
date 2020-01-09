@@ -4,13 +4,12 @@
 #   Nanostring output RCC readouts (html format) to raw data matrix
 ## NOTES:
 #   TODO: break out tests
-#       checking sample metrics
 #       check for unique sample names in sample sheet
 #
 ## ARGUMENTS:
-#   samplesheet: tsv of RCC filename in one col and sample name, 'ANTIBODY_REFERENCE.csv'
 #   rcc files
-#   abfile: antibody file to rename antibody names.
+#   samplesheet: tsv of RCC filename in one col and sample name, 'ANTIBODY_REFERENCE.csv'
+#   abfile: antibody file to rename antibody names.'ANTIBODY_REFERENCE.csv'
 ## RETURN:
 #   rawdata.txt: tab-sep file with table of Antibody x Sample
 #
