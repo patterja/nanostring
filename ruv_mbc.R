@@ -18,7 +18,8 @@ version="2.0"
 
 parser <- ArgumentParser()
 parser$add_argument("-i", help="3_IGG_SUBTRACTED.tsv", dest="input_file")
-parser$add_argument("--validation_file", type="character", default="/Volumes/Histopathology\ Shared\ Resource/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_sub_normalized.txt",
+parser$add_argument("--validation_file", type="character", 
+                    default="/Volumes/Histopathology\ Shared\ Resource/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_sub_normalized.txt",
                     dest="validation_file", help="validation file for controls comparison")
 parser$add_argument("--mbc_md_file", type="character", default= "/Volumes/Histopathology\ Shared\ Resource/CLINICAL/Nanostring/REFERENCE_FILES/validation_mbc_metadata.txt",
                     dest="mbc_md_file", help="metastatic breast cancer metadata file")
@@ -217,6 +218,7 @@ for (samp in setdiff(colnames(new_batch), make.names(controls))) {
                           no="notMBC")
   #rep matrix based only on controls in MBC batches
   combined_md$reps=ifelse(combined_md$mbc=="MBCcontrol", yes=combined_md$samp, no=combined_md$sampcolumn)
+  #combined_md$reps=ifelse(combined_md$mbc=="MBCcontrol", yes=combined_md$samp, no=ifelse(combined_md$batch=="newbatch", yes=combined_md$samp, combined_md$sampcolumn)
   #~ replicated matrix 
   repmat = replicate.matrix(combined_md$reps)
   

@@ -74,3 +74,4 @@ else
   fi
 fi
 fi
+#ssh "${REMOTE_SERVER}" "sg clbackup \"rsync -iv -a ${SRC_DIR}/${PROJ}.tar.gz exaclinical:${PROJ_DIR_BASE}\""
