@@ -108,13 +108,11 @@ def df2dictarrays(raw_data):
     for index, row in raw_data.iterrows():
         if "POS" in row.Name:
             pos.append(row.to_list())
-        elif "NEG" in row.Name:
-            neg.append(row.to_list())
         else:
             samples.append(row.to_list())
 
     # samples are a matrix with rows are antibodies and columns are samples
-    output_dict = {"pos": pos, "neg": neg, "samples": samples}
+    output_dict = {"pos": pos, "samples": samples}
     return output_dict
 
 
@@ -136,7 +134,7 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
     # mouseAb is a list of mouse antibodies
     # rabbitAb is a list of rabbit antibodies
 
-    # num_controls = 0.0
+    norm_factors={}
     sum_of_sums = 0.0
     header = True
     for row in pos:
@@ -156,6 +154,7 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
         for row_index in range(1, len(pos)):
             sample_sum += float(pos[row_index][sample_index])
         cf = mean_of_sums / sample_sum
+        norm_factors[pos[0][sample_index]] = [cf]
         for row_index in range(1, len(samples)):
             samples[row_index][sample_index] = float(samples[row_index][sample_index]) * cf
 
@@ -167,8 +166,9 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
             sample_col = []
             for row in samples:
                 sample_col.append(row[sample_index])
-            sample_col.pop(0)
-            sample_geomean = gm_mean(sample_col)
+            sample_col.pop(0) #removes rownames (ab name)
+            sample_geomean = gm_mean([x+1 for x in sample_col]) #add one for gm_mean of zeroes
+            sample_geomean = sample_geomean-1  # sub one to correct for add one
             geomeans.append(sample_geomean)
 
     grand_mean = sum(geomeans) / len(geomeans)
@@ -178,8 +178,11 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
         for row in samples:
             sample_col.append(row[sample_index])
         sample_col.pop(0)
-        sample_geomean = gm_mean(sample_col)
+        sample_geomean = gm_mean([x + 1 for x in sample_col])  # add one for gm_mean of zeroes
+        sample_geomean = sample_geomean - 1  # sub one to correct for add one
         cf = grand_mean / sample_geomean
+        norm_factors[samples[0][sample_index]].append(cf)
+
         header = True
         for row in samples:
             if header:
@@ -229,7 +232,7 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
                 pass
 
     output_list = [samples_1, samples_2, samples_3, samples]
-    return output_list
+    return output_list, norm_factors
 
 
 def write_norms(norm_dat):
@@ -285,7 +288,7 @@ def main():
     else:
         controls
 
-    norm_dat = geomean_norm(samples=split_data["samples"], controls=controls, pos=split_data["pos"], mouseAb=mouseAb, rabbitAb=rabbitAb)
+    norm_dat, norm_factors = geomean_norm(samples=split_data["samples"], controls=controls, pos=split_data["pos"], mouseAb=mouseAb, rabbitAb=rabbitAb)
     write_norms(norm_dat)
 
 if __name__ == "__main__":
