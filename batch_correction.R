@@ -10,15 +10,17 @@ suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(reshape2))
 suppressPackageStartupMessages(library(ruv))
 suppressPackageStartupMessages(library(xlsx))
+suppressPackageStartupMessages(library(gridExtra))
 
 ## ARGS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 version="3.0"
+mat_version = "20200320"
 
 
 parser <- ArgumentParser()
 parser$add_argument("-i", help="rawdata.txt", dest="input_file")
 parser$add_argument("--validation_file", type="character", 
-                    default="/Volumes/Histopathology Shared Resource/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_rawdata.txt",
+                    default=paste0("/Volumes/Histopathology Shared Resource/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_rawdata_", mat_version, ".txt"),
                     dest="validation_file", help="validation file for controls comparison")
 parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box Sync/NANOSTRING/nanostring_metadata.xlsx",
                     dest="md_file", help="metadata file")
@@ -29,7 +31,6 @@ parser$add_argument("--include_ctrls", action="store_true", default=FALSE,
 parser$add_argument("--version", action="version", version=paste0('%(prog)s = ', version))
 
 args <- parser$parse_args()
-includeBCCL = args$includeBCCL
 
 input_file = args$input_file
 validation_file = args$validation_file
@@ -105,7 +106,7 @@ ab_ref = read.csv(ab_ref_file, sep=",", stringsAsFactors=F)
 new_batch = read.table(file = input_file, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
 new_batch[,c("CodeClass", "Accession")] <- NULL
 
-# MBC 
+# metadata
 md = read.xlsx(file=md_file, sheetName = "nansostring_metadata", check.names=T, stringsAsFactors=F)
 md$sampcolumn = make.names(paste0(md$Batch, "__", md$Sample.Name))
 
@@ -115,41 +116,46 @@ ab.ctrl = make.names(rownames(new_batch)[grepl("IgG|NEG|^S6|^Histone", rownames(
 omit = c("Histone H3", "S6", "RbAb-IgG", "MmAb-IgG1", "p-TSC2", "TSC2", "NEG", "POS")
 omitregex = paste0(paste0("^", omit), collapse = "|")
 
-## RUV DATASET ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# LOOP THRU DATASET #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #empty data frame
-mbc_percentile=data.frame(row.names = rownames(validation)[!grepl(omitregex, rownames(validation))])
+samp_percentile=data.frame(row.names = rownames(validation)[!grepl(omitregex, rownames(validation))])
 
 for (samp in setdiff(colnames(new_batch), controls)) {
   print(samp)
   
   # COMBINING: rows combined with validation and mbc cohort, columns=ctrls and 1 samp only
-  idx_controls = which(colnames(new_batch) %in% controls)
-  newsampctl = new_batch[,c(idx_controls,which(colnames(new_batch)==samp))]
+  idx_newctrl = which(colnames(new_batch) %in% controls)
+  newsampctl = new_batch[,c(idx_newctrl,which(colnames(new_batch)==samp))]
   colnames(newsampctl) = paste0("newbatch", "__", colnames(newsampctl))
   comb = cbind(validation, newsampctl[match(rownames(validation), rownames(newsampctl)),])
   
-  # SCALE BY GEOMEAN
+  # METADATA: adjust metadata to match
+  comb_md = data.frame(batch = sapply(strsplit(as.character(colnames(comb)), "__"), `[`, 1), 
+                       samp =sapply(strsplit(as.character(colnames(comb)), "__"), `[`, 2),
+                       sampcolumn = c(colnames(comb)),stringsAsFactors = F, check.names = T)
+  md = md[md$sampcolumn %in% comb_md$sampcolumn,]
+  valid_controls=c(md$sampcolumn[md$cohort=="validation" & md$Study=="control"],paste0("newbatch__", controls))
+  
+  # REPLICATE MATRIX: rep matrix based only on controls in validation batches
+  comb_md$reps = ifelse(comb_md$sampcolumn %in% valid_controls, yes=comb_md$samp, no=comb_md$sampcolumn)
+  sort_comb_md = comb_md[order(comb_md$samp),]
+  
+  #~ BATCH CORRECTION: SCALE BY GEOMEAN~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  
+  idx_controls = which(comb_md$samp %in% controls)
   comb.noercc = comb[!grepl("NEG|POS", rownames(comb)),]
-  gm_cf = gm_mean(apply(comb.noercc, 2, gm_mean))/apply(comb.noercc, 2, gm_mean)
+  comb.noercc.ctrls = comb[!grepl("NEG|POS", rownames(comb)),idx_controls]
+  
+  gm_cf = gm_mean(apply(comb.noercc.ctrls, 2, gm_mean))/apply(comb.noercc, 2, gm_mean)
   comb.norm = t(t(comb.noercc)* gm_cf)
-  lcomb.norm = log2(comb.norm+1)
   
   #LOG
   lcomb=log2(comb+1)
   lcomb.norm = log2(comb.norm+1)
   
-  # METADATA: adjust metadata to match
-  mbc_controls=c(md$sampcolumn[md$MBC=="CONTROL"],paste0("newbatch__", controls))
-  # REPLICATE MATRIX: rep matrix based only on controls in MBC batches
-  comb_md = data.frame(batch = make.names(sapply(strsplit(as.character(colnames(comb.norm)), "__"), `[`, 1)), 
-                       samp =make.names(sapply(strsplit(as.character(colnames(comb.norm)), "__"), `[`, 2)),
-                       sampcolumn = c(colnames(comb.norm)),stringsAsFactors = F, check.names = T)
-  comb_md$reps = ifelse(comb_md$sampcolumn %in% mbc_controls, yes=comb_md$samp, no=comb_md$sampcolumn)
-  comb_md$MBC = md$MBC[match(comb_md$sampcolumn, md$sampcolumn)]
-  sort_comb_md = comb_md[order(comb_md$samp),]
-  # PLOTTING ~ plotting pre-ruv figures ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  
+  #~ RLE PLOT ~ pre-ruv figures ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ## filter out negatives and ab_order
   lctls = lcomb[!grepl("POS|NEG", rownames(lcomb)),]
   lctls = lctls[,sort_comb_md$sampcolumn[sort_comb_md$samp %in% controls]]
   limits_rle = max(as.matrix(lctls))-median(as.matrix(lctls))
@@ -164,17 +170,13 @@ for (samp in setdiff(colnames(new_batch), controls)) {
     labs(colour = "batch") +
     geom_hline(yintercept = 0, 
                linetype = "dotted", colour = "cyan") + 
-    ggtitle(paste0("Relative Log Expression Raw data",  samp))
+    ggtitle(paste0("Relative Log Expression Raw data ",  samp))
   #pca
   pca_orig = pcaplt(mat = (lctls), 
                     title="Raw", 
                     col = sort_comb_md$samp[sort_comb_md$samp %in% controls])
   
-  
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- 
-
-  # PLOTTING ~ plotting post norm figures ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #~ RLE PLOT ~post-ruv figures ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
   lctlnorm = lcomb.norm[,sort_comb_md$sampcolumn[sort_comb_md$samp %in% controls]]
   limits_rle = max(as.matrix(lctlnorm))-median(as.matrix(lctlnorm))
@@ -188,31 +190,69 @@ for (samp in setdiff(colnames(new_batch), controls)) {
     labs(colour = "batch") +
     geom_hline(yintercept = 0, 
                linetype = "dotted", colour = "cyan") + 
-    ggtitle(paste0("Relative Log Expression geomean normalized data\n",  samp))
+    ggtitle(paste0("Relative Log Expression geomean normalized data \n",  samp))
   #pca
   pca_norm = pcaplt(mat = (lctlnorm), 
                     title="Geomean Normalized", 
                     col = sort_comb_md$samp[sort_comb_md$samp %in% controls])
+  #~ RLE TABLE~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  prerle = t(apply(lctls, 1, function(x) x-median(x)))
+  postrle = t(apply(lctlnorm, 1, function(x) x-median(x)))
   
-  
-  
-  #~ MBC DATA PREP~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  # filter antibodies of interest
+  #~ VALIDATION DATA PREP~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   if (include_ctrls){
     print("keeping all antibodies: IgG and antibodies that did not perform well or did not have dynamic range")
     nmat=lcomb.norm
     other_abs=setdiff(rownames(nmat),ab_ref$X.AbID)
     ab_order = c(ab_ref$X.AbID[order(ab_ref$Target)], other_abs)
-    
   } else {
-
     nmat = lcomb.norm[!grepl(omitregex, rownames(comb.norm)),]
     #AB_ORDER
     ab_order = ab_ref$X.AbID[order(ab_ref$Target)]
     ab_order = ab_order[!grepl(omitregex, ab_order)]
-    
   }
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #~ TRA ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  #edat is post norm, comb.noercc is pre norm
+  edat = (exp(lcomb.norm))-1
+  prenorm = comb.noercc
+  for (ctrl in make.names(controls)){
+    tra = matrix(NA, nrow = 0, ncol = 3)
+    png(file=paste0("batchcorr_figures/",samp,"_", ctrl, "_TRA.png"), width = 800, height = 800)
+    #get matrix of celllines for controls not including batches of interest
+    v.ctrl_names = comb_md$sampcolumn[comb_md$samp == ctrl & !comb_md$batch=="newbatch"]
+    s.ctrl_names = comb_md$sampcolumn[comb_md$samp == ctrl & comb_md$batch=="newbatch"]
+    
+    selv.ctrl_pre = prenorm[,v.ctrl_names, drop=F]
+    sels.ctrl_pre = prenorm[,s.ctrl_names, drop=F]
+    selv.ctrl_post = data.frame(edat[,v.ctrl_names, drop=F])
+    sels.ctrl_post = data.frame(edat[,s.ctrl_names, drop=F])
+    
+    tra_ctrlpre = do.call(cbind, apply(selv.ctrl_pre, 2, function(x) log(x/sels.ctrl_pre)))
+    tra = data.frame(melt(as.matrix(tra_ctrlpre)), "sample"="pre")
+    tra_ctrlpost = do.call(cbind, apply(selv.ctrl_post, 2, function(x) log(x/sels.ctrl_post)))
+    tra = rbind(tra, data.frame(melt(as.matrix(tra_ctrlpost)), "sample"="post"))
+    
+    
+    p=ggplot(tra, aes(x=sample, y=value, fill=sample)) + 
+      geom_violin() +
+      facet_wrap(~Var1, scale="free") +
+      geom_hline(yintercept =0, color="red") +
+      labs(title=paste0("Distribution of TRA (technical replicate agreement) Pre and Post Normalization\nCompared To Each Controls In Validation Batch\n", samp, "_",ctrl),
+           y="log(validation count/sample count)") +
+      theme(legend.position = "bottom")
+    
+    plot(p)
+    dev.off()
+    tratab_pre = setNames(tra_ctrlpre, colnames(selv.ctrl_pre))
+    tratab_post = setNames(tra_ctrlpost, colnames(selv.ctrl_post))
+    write.table(tratab_pre, file=paste0("batchcorr_figures/",samp,"_", ctrl, "_TRA_prenorm.txt"),sep="\t", quote = F, row.names = T, col.names = NA)
+    write.table(tratab_post, file=paste0("batchcorr_figures/",samp,"_", ctrl,  "_TRA_postnorm.txt"),sep="\t", quote = F, row.names = T, col.names = NA)
+  }
+  
   #antibody threshold ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  # if signal for antibody below sample igg then turned to minimum of validation  cohort
+  # if signal above do nothing
   samp_raw = comb[,paste0("newbatch", "__", (samp)),drop=F]
   rbigg = samp_raw[which(rownames(samp_raw)=="RbAb-IgG"),]
   mmigg = samp_raw[which(rownames(samp_raw)=="MmAb-IgG1"),]
@@ -235,92 +275,85 @@ for (samp in setdiff(colnames(new_batch), controls)) {
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
   #~ split these apart makes plotting easier
-  #mbc only and newsamp only
-  mbc_nmat = nmat[,as.character(comb_md$sampcolumn[comb_md$MBC=="TRUE" & !is.na(comb_md$MBC)] ),drop=F]
-  new_nmat = nmat[,as.character(comb_md$sampcolumn[is.na(comb_md$MBC) & !comb_md$samp %in% controls]),drop=F]
+  #VALIDATION only and newsamp only
+  val_nmat = nmat[,as.character(comb_md$sampcolumn[md$cohort=="validation" & !md$Study=="control"] ),drop=F]
+  new_nmat = nmat[,as.character(comb_md$sampcolumn[comb_md$batch=="newbatch" & !comb_md$samp %in% controls]),drop=F]
   
   #~ MELTING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  mbc.m = melt(mbc_nmat,  id.vars=row.names)
+  val.m = melt(val_nmat,  id.vars=row.names)
   new.m = melt(new_nmat, id.vars=row.names)
-  mbc_ecdf = tapply(mbc.m$value, mbc.m$Var1, ecdf)
-  
+  valid_ecdf = tapply(val.m$value, val.m$Var1, ecdf)
   mat_new.m = as.matrix(new.m)
   
   for (idx in seq(1:nrow(mat_new.m))){
     new_samp=mat_new.m[idx,]
-    mbc_percentile[new_samp[1],samp] = mbc_ecdf[[new_samp[1]]](new_samp[3])
+    samp_percentile[new_samp[1],samp] = valid_ecdf[[new_samp[1]]](new_samp[3])
   }
   #  mbc_percentile[,samp] =  as.vector(apply(newruv.m, 1, function(x) 
   #    ((mbc_ecdf[[as.character(x["Var1"])]](x[["value"]]))))[rownames(mbc_percentile)])
-  
   #max and min
   m.mat = melt(as.matrix(nmat))
   
   norm_stats = data.frame(
     "min" = tapply(m.mat$value, m.mat$Var1, min),
     "q1" = tapply(m.mat$value, m.mat$Var1, function(x) quantile(x, 0.25)),
-    "mean" = tapply(m.mat$value, m.mat$Var1, median),
+    "median" = tapply(m.mat$value, m.mat$Var1, median),
     "q3" = tapply(m.mat$value, m.mat$Var1, function(x) quantile(x, 0.75)),
     "max" = tapply(m.mat$value, m.mat$Var1, max))
   
-  mbc.m$Var1 = factor(mbc.m$Var1, levels=ab_order)
+  val.m$Var1 = factor(val.m$Var1, levels=ab_order)
   new.m$Var1 = factor(new.m$Var1, levels=ab_order)
   norm_stats$ab = factor(rownames(norm_stats), levels=ab_order)
   
-  mbc_labels= paste0(as.character(levels(new.m$Var1))," (",round(new.m$value, 1), ",",round(mbc_percentile[as.character(levels(new.m$Var1)), samp]*100,0),")")
+  ab_labels= paste0(as.character(levels(new.m$Var1))," (",round(new.m$value, 1), ",",round(samp_percentile[as.character(levels(new.m$Var1)), samp]*100,0),")")
   
   #PLOTTING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
   #~ boxplot of MBC
-  bp_mbc = ggplot(data.frame(mbc.m)) +
+  bp = ggplot(norm_stats, aes(x=ab, y=q1)) +
+    geom_crossbar(aes(ymin = min, ymax = q1), width = 0.9, color="#606060") +
+    geom_crossbar(aes(ymin = q1, ymax = q3), width = 0.9, color="#606060", fatten=0.5, fill="#808080") +
+    geom_crossbar(aes(ymin = q3, ymax = max), width = 0.9, color="#606060", fatten=0.5) +
     geom_point(data=new.m, mapping=aes(x=factor(Var1), y=value), colour=c('red'), shape=8, size=2) +
-    geom_linerange(
-      data=norm_stats, aes(x=ab, ymin = min, ymax = max),
-      color = "#808080", 
-      size = 7, 
-      alpha = 0.7) +
-    #geom_point(data = ruv_stats, aes(x=ab, y=max),shape=93, fill="grey") +
-    geom_boxplot(aes(factor(Var1), as.numeric(value)), outlier.colour = NA) +
-    geom_point(data=new.m, mapping=aes(x=factor(Var1), y=value), colour=c('red'), shape=8, size=2) +
-    scale_x_discrete(labels=paste0(as.character(levels(new.m$Var1))," (",
-                                   round(mbc_percentile[as.character(levels(new.m$Var1)), samp]*100,0),")")) +
-    labs(x="Antibody (Percentiles)", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="RUVnormalized") +
+    #geom_linerange(
+    #  data=norm_stats, aes(x=ab, ymin = min, ymax = max),
+    #  color = "#808080", 
+    #  size = 7, 
+    #  alpha = 0.7) +
+    #geom_boxplot(aes(factor(Var1), as.numeric(value)), outlier.colour = NA) +
+    #scale_x_discrete(labels=paste0(as.character(levels(new.m$Var1))," (",
+    #                               round(samp_percentile[as.character(levels(new.m$Var1)), samp]*100,0),")")) +
+    labs(x="Antibody (Percentiles)", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="Geomean Normalized") +
     theme(panel.background = element_rect(fill = "white"),
           panel.grid.major=element_line(colour="gray"),
           plot.title = element_text(hjust = 0.5, vjust=0),
           legend.text=element_text(size=8),
           legend.position="right",
-          axis.text.x = element_text(size=7, colour=c("black", "red")),
+          axis.text.x = element_text(size=7, colour=c("black")),
           axis.text.y = element_text(size=7, colour="black")) +
     coord_flip()
   
   print("saving normalization plots")
   pdf(paste0("batchcorr_figures/",samp,"_hierarchical_clustering_plot.pdf"), width = 7, height = 7)
   par(cex=0.7)
-  plot(hclust(dist(t(lctls[!make.names(rownames(lctls)) %in% ab.ctrl,]), method ="euclidean")),
-               main="Raw Data")
-  plot(hclust(dist(t(lctlnorm[!make.names(rownames(lctlnorm)) %in% ab.ctrl,]), method ="euclidean")), 
-                   main="Geomean Normalized")
+  plot(hclust(dist(t(lctls[!make.names(rownames(lctls)) %in% ab.ctrl,]), method ="euclidean")),main="Raw Data")
+  plot(hclust(dist(t(lctlnorm[!make.names(rownames(lctlnorm)) %in% ab.ctrl,]), method ="euclidean")),main="Geomean Normalized")
   dev.off()
   
   #~ save all plots
-  ggsave(file=paste0(samp, "_MBC.pdf"), bp_mbc, device="pdf", width = 8, height = 6)
-  ggsave(file=paste0("batchcorr_figures/",samp, "_controls_raw_RLE.pdf"), 
-         device="pdf", rle_orig, width = 9, height = 4.5)
-  ggsave(file=paste0("batchcorr_figures/",samp, "_controls_raw_PCA.pdf"), 
-         device="pdf", pca_orig, width = 8, height = 7)
-  ggsave(file=paste0("batchcorr_figures/",samp, "_controls_bc_RLE.pdf"), 
-         device="pdf", rle_norm, width = 9, height = 4.5)
-  ggsave(file=paste0("batchcorr_figures/",samp, "_controls_bc_PCA.pdf"), 
-         device="pdf", pca_norm, width = 8, height = 7)
-  
-  
-  write.table(x = t(comb.norm), file=paste0("batchcorr_figures/",samp, "_batchcorr.tsv"), 
-              sep="\t", quote = F, row.names = T, col.names = NA)
+  ggsave(file=paste0(samp, "_MBC.pdf"), bp, device="pdf", width = 8, height = 6)
+  write.table(prerle, file=paste0("batchcorr_figures/",samp,"_", ctrl, "_raw_RLEtable.txt"),sep="\t", quote = F, row.names = T, col.names = NA)
+  write.table(postrle, file=paste0("batchcorr_figures/",samp,"_", ctrl,  "_bc_RLEtable.txt"),sep="\t", quote = F, row.names = T, col.names = NA)
+  ggsave(file=paste0("batchcorr_figures/",samp, "_controls_raw_RLE.pdf"),device="pdf", rle_orig, width = 9, height = 4.5)
+  ggsave(file=paste0("batchcorr_figures/",samp, "_controls_raw_PCA.pdf"),device="pdf", pca_orig, width = 8, height = 7)
+  ggsave(file=paste0("batchcorr_figures/",samp, "_controls_bc_RLE.pdf"),device="pdf", rle_norm, width = 9, height = 4.5)
+  ggsave(file=paste0("batchcorr_figures/",samp, "_controls_bc_PCA.pdf"),device="pdf", pca_norm, width = 8, height = 7)
+
+  write.table(x = nmat, file=paste0("batchcorr_figures/",samp, "_batchcorr.tsv"),sep="\t", quote = F, row.names = T, col.names = NA)
 }
 
 tar(tarfile=paste0("batchcorr_figures.tar.gz"), files=paste0("batchcorr_figures"), compression="gzip", tar="tar")
-write.table(x = round(mbc_percentile, 2), file=paste0("MBC_percentiles.tsv"), sep="\t", quote = F, row.names = T, col.names = NA)
+write.table(x = round(samp_percentile, 2), file=paste0("samp_percentiles.tsv"), sep="\t", quote = F, row.names = T, col.names = NA)
 
 
 
