@@ -309,9 +309,9 @@ for (samp in setdiff(colnames(new_batch), controls)) {
     
     #~ boxplot of MBC
     bp = ggplot(norm_stats, aes(x=ab, y=q1)) +
-      geom_crossbar(aes(ymin = min, ymax = q1), width = 0.9, color="#606060") +
-      geom_crossbar(aes(ymin = q1, ymax = q3), width = 0.9, color="#606060", fatten=0.5, fill="#808080") +
-      geom_crossbar(aes(ymin = q3, ymax = max), width = 0.9, color="#606060", fatten=0.5) +
+      geom_crossbar(aes(ymin = min, ymax = q1), width = 0.9, color="#606060",fill="#ececec") +
+      geom_crossbar(aes(ymin = q1, ymax = q3), width = 0.9, color="#606060", fatten=0.5, fill="#c0c0c0") +
+      geom_crossbar(aes(ymin = q3, ymax = max), width = 0.9, color="#606060", fatten=0.5,fill="#808080") +
       geom_point(data=new.m, mapping=aes(x=factor(Var1), y=value), colour=c('red'), shape=8, size=2) +
       #geom_linerange(
       #  data=norm_stats, aes(x=ab, ymin = min, ymax = max),
@@ -321,7 +321,7 @@ for (samp in setdiff(colnames(new_batch), controls)) {
       #geom_boxplot(aes(factor(Var1), as.numeric(value)), outlier.colour = NA) +
       #scale_x_discrete(labels=paste0(as.character(levels(new.m$Var1))," (",
       #                               round(samp_percentile[as.character(levels(new.m$Var1)), samp]*100,0),")")) +
-      labs(x="Antibody (Percentiles)", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="Geomean Normalized") +
+      labs(x="Antibody", title=paste0(samp,  "\n within Distribution of Metastatic Breast Cancers"), y="RUV corrected") +
       theme(panel.background = element_rect(fill = "white"),
             panel.grid.major=element_line(colour="gray"),
             plot.title = element_text(hjust = 0.5, vjust=0),
