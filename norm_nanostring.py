@@ -16,7 +16,7 @@ import math
 import csv
 import copy
 
-VERSION="1.0.0"
+VERSION="2.0.0"
 
 
 def supply_args():
@@ -35,8 +35,6 @@ def supply_args():
     return args
 
 
-VERSION = "2.0.0"
-
 
 def define_controls():
     """
@@ -45,7 +43,7 @@ def define_controls():
     Args: no args
     Return: list of controls, and control help string
     """
-    controls = ["MCF7", "HCC1954", "BT474", "HeyA8", "MDA468 control", "MDA468control",
+    controls = ["MCF7", "HCC1954", "BT474", "HeyA8", "MDA468 control",
                 "MDA468+EGF"]
 
     # make the control help statement for norm geomean ctrl input
@@ -108,6 +106,8 @@ def df2dictarrays(raw_data):
     for index, row in raw_data.iterrows():
         if "POS" in row.Name:
             pos.append(row.to_list())
+        #elif "NEG" in  row.Name:
+        #    neg.append(row.to_list())
         else:
             samples.append(row.to_list())
 
@@ -165,18 +165,20 @@ def geomean_norm(samples, controls, pos, mouseAb, rabbitAb):
         if samples[0][sample_index].strip() in controls:
             sample_col = []
             for row in samples:
-                sample_col.append(row[sample_index])
+                if not "NEG" in row[0]:
+                    sample_col.append(row[sample_index])
             sample_col.pop(0) #removes rownames (ab name)
             sample_geomean = gm_mean([x+1 for x in sample_col]) #add one for gm_mean of zeroes
             sample_geomean = sample_geomean-1  # sub one to correct for add one
             geomeans.append(sample_geomean)
 
-    grand_mean = sum(geomeans) / len(geomeans)
+    grand_mean = gm_mean(geomeans)
 
     for sample_index in range(1, len(samples[0])):
         sample_col = []
         for row in samples:
-            sample_col.append(row[sample_index])
+            if not "NEG" in row[0]:
+                sample_col.append(row[sample_index])
         sample_col.pop(0)
         sample_geomean = gm_mean([x + 1 for x in sample_col])  # add one for gm_mean of zeroes
         sample_geomean = sample_geomean - 1  # sub one to correct for add one
@@ -276,7 +278,12 @@ def main():
         ab_name, rabbitAb, mouseAb = parse_Ab_ref(args.abfile)
 
     raw_data = pandas.read_csv(args.rawdata, sep="\t", index_col=False)
-
+    # check that controls are in this df for further processing
+    for c in controls:
+        lcols = raw_data.columns.tolist()
+        if c not in lcols:
+            print('Control ' + c + 'not in data frame')
+            exit()
     #Prep for dictionary of arrays
     raw_data_short = raw_data.drop(['CodeClass','Accession'], 1)
     split_data = df2dictarrays(raw_data_short)
