@@ -176,7 +176,7 @@ for (f in 1:length(unique(samps2batchcorr$Batch))){
 
 validation = read.csv(validation_file, sep= "\t", row.names = 1, check.names = T)
 validation = validation[,md$sampcolumn[md$cohort=="validation"]]
-## remove samples from validation cohort if they exists. 
+## remove samples from validation cohort if they exists, just to avoid redundancy
 validation = validation[,!colnames(validation) %in% make.names(colnames(allbatch_norms))]
 
 # COMBINING DATA ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -276,35 +276,54 @@ samps.datm = melt(samps_dat, id.vars=row.names)
 
 #~ TRA ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-edat = (exp(fbcdat))-1
+# ebcdat = (exp(fbcdat))[!grepl("NEG", rownames(fbcdat)),]
+# v.raw = validation[!grepl("NEG", rownames(validation)),valid_celllines]
+# s.raw = allbatch_norms[!grepl("NEG", rownames(allbatch_norms)), samp_celllines]
+# 
+# mytheme <- gridExtra::ttheme_default(core = list(fg_params=list(cex = 0.5)))
+# for (ctrl in make.names(controls)){
+#   tra = matrix(NA, nrow = 0, ncol = 3)
+#   #raw
+#   val.ctrl_pre = v.raw[,combined_md$sampcolumn[combined_md$samp==ctrl]]
+#   sel.ctrl_pre = raw[,samp_celllines]
+#   tra_ctrlpre = do.call(cbind, apply(val.ctrl_pre, 1, function(x) log(x/sel.ctrl_pre)))
+#   tra = data.frame(melt(as.matrix(tra_ctrlpre)), "sample"="raw")
+#   sel.ctrl_ruv = data.frame(ruv[ctrl_md$sampcolumn[ctrl_md$samp_deid==ctrl],], check.names = F)
+#   tra_ctrlruv = do.call(cbind, apply(sel.ctrl_ruv, 1, function(x) log(x/sel.ctrl_ruv)))
+#   tra = rbind(tra, data.frame(melt(as.matrix(tra_ctrlruv)), "sample"=paste0("set",i)))
+#   
+#   for (i in 1:length(l.ruvcts)){
+#     rc=l.ruvcts[[i]]
+#     ruvctls = which(colnames(Y.full) %in% rc)
+#     Y.ruv = RUVIII(Y.full, M = repmat, ctl = ruvctls, k=1)
+#     Y.ruv = Y.ruv[,-(grep("POS|NEG", colnames(Y.ruv)))]
+#     ruv = exp(Y.ruv)
+#     sel.ctrl_ruv = data.frame(ruv[ctrl_md$sampcolumn[ctrl_md$samp_deid==ctrl],], check.names = F)
+#     tra_ctrlruv = do.call(cbind, apply(sel.ctrl_ruv, 1, function(x) log(x/sel.ctrl_ruv)))
+#     tra = rbind(tra, data.frame(melt(as.matrix(tra_ctrlruv)), "sample"=paste0("set",i)))
+#   }
+#   
+#   tra$v1_cellline = sapply(strsplit(as.character(tra$Var1),  "__"), "[", 2)
+#   tra$v2_clab = sapply(strsplit(as.character(tra$Var2),  "__"), "[", 2)
+#   
+#   tra$ab=unlist(apply(tra, 1, function(l) substring(as.character(l[["v2_clab"]]),nchar(as.character(l[["v1_cellline"]]))+2,nchar(as.character(l[["v2_clab"]])))))
+#   
+#   #get rid of value=0 because that's when i was logging by it's own matrix
+#   tra = tra[which(tra$value!=0),]
+#   
+#   p=ggplot(tra, aes(x=sample, y=value, fill=sample)) + 
+#     geom_boxplot(lwd=0.1) +
+#     facet_wrap(~ab, scale="free") +
+#     geom_hline(yintercept =0, color="red") +
+#     labs(title=paste0("Distribution of TRA (technical replicate agreement) with Validation Batches\n", sampname, "_",ctrl),
+#          y="e^(ruv_validation)/e^(ruv_batch_cellline_control)") +
+#     theme(plot.title = element_text(size=8), 
+#           axis.text.x = element_text(angle = 90, hjust = 1, size = 6), 
+#           legend.position = "none", axis.text.y= element_text(size=5))
+#   dev.off()
+# }
 
 
-for (ctrl in make.names(controls)){
-  tra = matrix(NA, nrow = 0, ncol = 3)
-  png(file=paste0(dirname(normalizePath(comb_sheet)), "/", sampname, "_", ctrl, "_TRA_boxplot.png"), width = 800, height = 800)
-  #get matrix of celllines for controls not including batches of interest
-  v.ctrl_names = setdiff(combined_md$sampcolumn[combined_md$samp == ctrl], samp_celllines)
-  s.ctrl_names = intersect(combined_md$sampcolumn[combined_md$samp == ctrl], samp_celllines)
-  
-  selv.ctrl = edat[,v.ctrl_names]
-  sels.ctrl = edat[,s.ctrl_names]
-  
-  #tra_ctrl= apply(sels.ctrl[names(selv.ctrl_median),], 2, function(x) log(selv.ctrl_median/x))
-  for (col in 1:ncol(selv.ctrl)){
-    tra_ctrl = apply(sels.ctrl[rownames(selv.ctrl),], 2, function(x) (selv.ctrl[,col]/x))
-    tra = rbind(tra, melt(tra_ctrl))
-  }
- 
-  
-  p=ggplot(tra, aes(x=Var1, y=value, fill=Var2)) + 
-    geom_boxplot() +
-    facet_wrap(~Var1, scale="free") +
-    labs(title=paste0("Distribution of TRA (technical replicate agreement) with Validation Batches\n", sampname, "_",ctrl),
-         y="e^(ruv_validation)/e^(ruv_batch_cellline_control)") +
-    theme(legend.position = "bottom")
-  plot(p)
-  dev.off()
-}
 
 
 # ANTIBODY THRESHOLDING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

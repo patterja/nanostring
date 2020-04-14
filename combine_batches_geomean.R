@@ -121,6 +121,7 @@ sampname = gsub("_samplesheet.txt", "", basename(comb_sheet))
 # METADATA ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 md = read.xlsx(file=md_file, sheetName = "nansostring_metadata", check.names=T, stringsAsFactors=F)
+md = md[rowSums(is.na(md)) != ncol(md),]
 md$sampcolumn = make.names(paste0(md$Batch, "__", md$Sample.Name))
 
 # antibody metadata
@@ -129,6 +130,7 @@ ab_ref = read.csv(ab_ref_file, sep=",", stringsAsFactors=F)
 #~ PARSE ALL SAMPLES FROM ALL BATCHES TO COMBINE ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 allbatch_norms = c()
 md_allbatch_norms = c()
+ 
 for (f in 1:length(unique(samps2batchcorr$Batch))){
   
   #get raw data
