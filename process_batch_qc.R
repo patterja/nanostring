@@ -65,7 +65,7 @@ ctrlregex = gsub("\\+", "\\\\+", paste0(paste0(controls, collapse = "|"),"|", "M
 pos = read.csv(pos_file, sep= "\t", row.names = 3, check.names = F)
 
 #metadata
-md = read.xlsx(file=md_file, sheetName = "nansostring_metadata", check.names=F)
+md = read.xlsx(file=md_file, sheetName = "nanostring_metadata", check.names=F)
 md$combined_name = paste0(md$Batch, "__", md$`Sample Name`)
 
 
