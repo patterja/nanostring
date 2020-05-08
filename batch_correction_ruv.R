@@ -273,8 +273,10 @@ for (samp in setdiff(colnames(new_batch), controls)) {
   dev.off()
   
   pdf(paste0("ruv_figures/",samp,"_RLE_heatmap.pdf"), width = 7, height = 8)
-  print(pheat_raw)
-  print(pheat_ruv)
+  grid::grid.newpage()
+  grid::grid.draw(pheat_raw)
+  grid::grid.newpage()
+  grid::grid.draw(pheat_ruv)
   dev.off()
   
   pdf(paste0("ruv_figures/",samp,"_PCA.pdf"), width = 8, height = 8)
