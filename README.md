@@ -1,4 +1,4 @@
-# Nanostring processing
+## Analysis of Nanostring nCounter Vantage Protein Assays
 
 Knight Diagnoistics Laboratory
 
@@ -10,7 +10,7 @@ at the moment which contains only a couple functions. However there is the poten
 and simplify some of these processing scripts. 
 
 
-## Nanostring Normalization
+### Nanostring Normalization
 
 
 
