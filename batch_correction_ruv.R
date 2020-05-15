@@ -16,7 +16,7 @@ suppressPackageStartupMessages(library(gridExtra))
 
 ## ARGS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 version="4.0"
-mat_version = "20200320"
+mat_version = "20200512"
 ihc_version = "20200507"
 parser <- ArgumentParser()
 
@@ -43,8 +43,11 @@ include_ctrls = args$include_ctrls
 ihc_file = args$ihc_file
 
 ## TEST ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-if (!grepl("rawdata", input_file)){
+if (!basename(input_file)=="rawdata.txt"){
   print("Error: The input file is not rawdata.txt")
+  stop()
+} else if (!basename(input_file)=="FAILED_rawdata.txt"){
+    print("Batch QC failed do not analyze!")
   stop()
 }
 
@@ -61,10 +64,9 @@ md$sampcolumn = make.names(paste0(md$Batch, "__", md$Sample.Name))
 # validation file
 validation = read.csv(validation_file, sep= "\t", row.names = 1, check.names = T)
 
-
 #ihc status
 ihc = read.csv(ihc_file, sep= "\t", row.names = 1, check.names = T)
-ihc$sampcolumn = paste0(ihc$Batch, "__", ihc$Sample.Name)
+ihc$sampcolumn = make.names(paste0(ihc$Batch, "__", ihc$Sample.Name))
 
 #remove ihc duplicates
 root_name = sapply(strsplit(as.character(ihc$Sample.Name), "\\s+"), `[`, 1)
@@ -253,7 +255,7 @@ for (samp in setdiff(colnames(new_batch), controls)) {
     tra = rbind(tra, data.frame(melt(as.matrix(tra_ctrl_raw)), "sample"="raw"))
     tra = rbind(tra, data.frame(melt(as.matrix(tra_ctrl_ruv)), "sample"="ruv"))
     }
-  tra = tra[!is.infinite(tra$value),]
+  tra = tra[!is.infinite(tra$value) & !is.na(tra$value),]
   ptra=ggplot(tra, aes(x=sample, y=value, fill=sample)) + 
     geom_boxplot() +
     facet_wrap(~Var2, scale="free") +
@@ -430,6 +432,8 @@ for (samp in setdiff(colnames(new_batch), controls)) {
     samp_cohorts_box = c()
     for (coh in unique(comb_cohorts$ab)){
       samp_cohorts_box = rbind(samp_cohorts_box, data.frame(samp_cohorts, "ab"=coh))}
+    comb_cohorts_box$Var1 = factor(comb_cohorts_box$Var1, levels=ab_order)
+    samp_cohorts_box$Var1 = factor(samp_cohorts_box$Var1, levels=ab_order)
     
     bp = ggplot(comb_cohorts_box, aes(x=ab, y=value)) + 
       geom_boxplot() +
