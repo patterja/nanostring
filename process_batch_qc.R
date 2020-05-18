@@ -1,9 +1,7 @@
 #!/usr/bin/env Rscript
 
-##
-## QC metrics, RUV and comparison with MBC cohort 
-## Usage
-## Usage:
+## QC metrics and tables
+## Usage: see combined_batches_ruv.R --help
 ##
 suppressPackageStartupMessages(library(argparse))
 suppressPackageStartupMessages(library(ggplot2))

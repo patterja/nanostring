@@ -2,8 +2,7 @@
 
 ## RUV batch correction
 ## 
-## Usage
-## ./ruv_batchcorrection.R -i rawdata.txt --validation_file validation_samples_rawdata.txt --md_file nanostring_metadata.xlsx --ab_ref_file ANTIBODY_REFERENCE.csv
+## Usage: ./ruv_batchcorrection.R --help 
 ##
 suppressPackageStartupMessages(library(argparse))
 suppressPackageStartupMessages(library(ggplot2))
@@ -46,7 +45,7 @@ ihc_file = args$ihc_file
 if (!basename(input_file)=="rawdata.txt"){
   print("Error: The input file is not rawdata.txt")
   stop()
-} else if (!basename(input_file)=="FAILED_rawdata.txt"){
+} else if (basename(input_file)=="FAILED_rawdata.txt"){
     print("Batch QC failed do not analyze!")
   stop()
 }
@@ -440,7 +439,7 @@ for (samp in setdiff(colnames(new_batch), controls)) {
       geom_point(data=samp_cohorts_box[samp_cohorts_box$detectable==TRUE,], mapping=aes(x=ab, y=newvalue), colour="red", shape=8, size=2) +
       geom_text(data=samp_cohorts_box[samp_cohorts_box$detectable==FALSE,], mapping=aes(x=ab, y=newvalue), colour="red", label="ND", size=3, position=position_jitter(width=c(0.03))) +
       facet_wrap(~Var1, scale="free") +
-      labs(x="cohort", y="log batch corrected counts", title=unique(samp_cohorts_box$Var2)) +
+      labs(x="cohort", y="log batch corrected counts", title=gsub("newbatch__", "", unique(samp_cohorts_box$Var2))) +
       scale_color_manual(values=c("red", "blue")) +
       theme(panel.background = element_rect(fill = "white"),
             panel.grid.major=element_line(colour="gray90"),

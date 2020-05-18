@@ -1,12 +1,7 @@
 #!/usr/bin/env Rscript
 
-##
-## Usage
-## ./gm_batch_correction.R /Users/patterja/Box\ Sync/NANOSTRING/data/ comb_sheet.txt validation_file mbc_md_file
-## data_dir = where all your data lives
-## comb_sheet = txt file samples and normalized matrices
-## validation_file = txt file of validation data normalized
-## mbc_md_file =txt with metastatic breast cancer list. 
+## Takes 2 or more samples run RUV. Performs QC and plots boxplot and binmaps
+## Usage ./combined_batches_ruv.R --help
 ##
 suppressPackageStartupMessages(library(argparse))
 suppressPackageStartupMessages(library(ggplot2))
@@ -16,7 +11,6 @@ suppressPackageStartupMessages(library(xlsx))
 suppressPackageStartupMessages(library(ruv))
 suppressPackageStartupMessages(library(nanostring))
 suppressPackageStartupMessages(library(gridExtra))
-
 
 version="4.0"
 mat_version = "20200320"
@@ -57,8 +51,11 @@ ab.ctrl = "IgG|POS|NEG|^S6|^Histone"
 
 #FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #todo: add these nanostring package
-# ~ functions for pairs plot
+# ~ functions for pairs plot for
 panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+  #' @param x: vector of numbers
+  #' @param y: vector of numbers
+  #' @return plot
 {
   usr <- par("usr"); on.exit(par(usr))
   par(usr = c(0, 1, 0, 1))
@@ -69,6 +66,9 @@ panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
   text(0.5, 0.5, txt, cex = cex.cor * r)
 }
 scatter_line <- function(x,y,...){
+  #' @param x: vector of numbers
+  #' @param y: vector of numbers
+  #' @return add abline
   points(x,y,...)
   abline(a = 0,b = 1,...)
 }
@@ -90,6 +90,9 @@ md$sampcolumn = make.names(paste0(md$Batch, "__", md$Sample.Name))
 
 # antibody metadata 
 ab_ref = read.csv(ab_ref_file, sep=",", stringsAsFactors=F)
+pathways = data.frame(ab_ref$X.AbID, Pathway = sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 1))
+pathways = rbind(pathways, data.frame(ab_ref$X.AbID, Pathway=sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 2)))
+pathways = pathways[complete.cases(pathways),]
 
 #~ validation
 validation = read.csv(validation_file, sep= "\t", row.names = 1, check.names = T)
@@ -115,16 +118,23 @@ for (f in 1:length(unique(samps2batchcorr$Batch))){
   #get raw data
   batch_name = samps2batchcorr$Batch[f]
   file_name = as.character(paste0(data_dir,"/",batch_name ,"/rawdata.txt"))
-  batch = read.table(file = file_name, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
+  if (file.exists(file_name)){
+    batch = read.table(file = file_name, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
+  } else {
+    
+    stop(sprintf("Batch QC failed do not analyze! Batch %s", batch_name))
+  }
   batch[,c("CodeClass", "Accession")] <- NULL
+  
+  ## TEST ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
   #TEST to see if sample names in batch directories
   if(any(colnames(batch) %in% make.names(samps2batchcorr$Sample.Name))){
-    print(paste0("Sample:", samps2batchcorr$Sample.Name[f], " in ", file_name))}
-  else{
+    print(paste0("Sample:", samps2batchcorr$Sample.Name[f], " in ", file_name))
+    } else {
     print(paste0("Sample:", samps2batchcorr$Sample.Name[f], " NOT in ", file_name, "\n Check sample name."))
     stop()
-  }
+    }
   #TEST to make sure the controls are in each batch
   for (ctrl in make.names(controls)){
     if (!ctrl %in% colnames(batch)){
@@ -133,6 +143,7 @@ for (f in 1:length(unique(samps2batchcorr$Batch))){
       print(paste0(ctrl, " controls accounted for."))
     }
   }
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
   #get only samples you want to batch and the controls
   idx_controls = which(make.names(colnames(batch)) %in% make.names(controls))
@@ -366,19 +377,19 @@ print(pca_raw)
 print(pca_ruv)
 dev.off()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#~ BATCH CORRECTED DATA FILTERING~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~ BATCH CORRECTED DATA FILTERING~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if (include_ctrls){
   print("keeping all antibodies: IgG and antibodies that did not perform well or did not have dynamic range")
   fbcdat = bcdat
   other_abs=setdiff(colnames(bcdat),ab_ref$X.AbID)
   ab_order = c(ab_ref$X.AbID[order(ab_ref$Target)], other_abs)
-  
+  pathways = pathways[pathways$ab_ref.X.AbID %in% ab_order,]
 } else {
   fbcdat = bcdat[!grepl(omitregex, rownames(bcdat)),]
   #AB_ORDER
   ab_order = ab_ref$X.AbID[order(ab_ref$Target)]
   ab_order = ab_order[!grepl(omitregex, ab_order)]
-  
+  pathways = pathways[pathways$ab_ref.X.AbID %in% ab_order,]
 }
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ SPLITTING AND MELTING~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -487,43 +498,47 @@ msamp$cohortnames = paste0(make.names(sapply(strsplit(as.character(msamp$variabl
 msamp$names = paste0(msamp$cohortnames,"__", msamp$sampnames)
 
 
-hmlist <- list()
-for (thresholds in colnames(thresh)){
-  mmsamp = msamp[grepl(thresholds, msamp$variable),]
-  mmsamp$Var1 = factor(mmsamp$Var1, levels=ab_order)
-  mmsamp$discrete_ab = as.numeric(factor(mmsamp$Var1))
-  
-  hm= ggplot(mmsamp) +
-    geom_tile(aes(x=names, y=discrete_ab, fill=factor(value)),colour = "grey50") +
-    scale_fill_manual(values=c("indeterminate"="white", "ND"="black","low"="yellow","high"="blue")) +
-    scale_x_discrete(name ="Cohort", breaks = mmsamp$cohortnames, labels = mmsamp$names) +
-    #scale_y_continuous(breaks=mmsamp$discrete_ab, label=mmsamp$Var1, sec.axis = sec_axis(~.,breaks = mmsamp$discrete_ab,labels = round(mmsamp$rat, 1), name=paste0("Ratio of Biopsies: ", rationame)))+
-    labs(x="Cohort", title=paste0("Threshold on ", thresh[1,thresholds], " and ", thresh[2,thresholds],"\n",  unique(mmsamp$sampnames)), y="Antibody") +
-    theme(axis.text.x = element_text(size=6, colour=c("black"), angle = 90, hjust=1, vjust=0.5),
-          axis.text.y = element_text(size=6),
-          axis.title.x = element_text(size=6),
-          axis.title.y = element_text(size=6),
-          panel.grid.major = element_line(size = 0.5, linetype = 'solid',
-                                          colour = "gray60"),
-          panel.background = element_blank(),
-          plot.title = element_text(hjust = 0.5, size=9)) 
-  
-  hmlist[[thresholds]] = hm
-  
+samphmlist <- list()
+for (samp in samps){
+  for (thresholds in colnames(thresh)){
+    mmsamp = msamp[grepl(thresholds, msamp$variable),]
+    mmsamp$Var1 = factor(mmsamp$Var1, levels=ab_order)
+    #mmsamp$discrete_ab = as.numeric(factor(mmsamp$Var1))
+    mmsamp$cohortnames = factor(mmsamp$cohortnames, levels = unique(mmsamp$cohortnames))
+    hm= ggplot(mmsamp) +
+      geom_tile(aes(x=names, y=cohortnames, fill=factor(value)),colour = "grey50") +
+      scale_fill_manual(values=c("indeterminate"="white", "ND"="black","low"="yellow","high"="blue")) +
+      scale_x_discrete(name ="Cohort", breaks = mmsamp$cohortnames, labels = mmsamp$names) +
+      #scale_y_continuous(breaks=mmsamp$discrete_ab, label=mmsamp$Var1, sec.axis = sec_axis(~.,breaks = mmsamp$discrete_ab,labels = round(mmsamp$rat, 1), name=paste0("Ratio of Biopsies: ", rationame)))+
+      labs(x="Cohort", title=paste0("Threshold on ", thresh[1,thresholds], " and ", thresh[2,thresholds],"\n",  unique(mmsamp$sampnames)), y="Antibody") +
+      theme(axis.text.x = element_text(size=6, colour=c("black"), angle = 90, hjust=1, vjust=0.5),
+            axis.text.y = element_text(size=6),
+            axis.title.x = element_text(size=6),
+            axis.title.y = element_text(size=6),
+            panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                            colour = "gray60"),
+            panel.background = element_blank(),
+            plot.title = element_text(hjust = 0.5, size=9),
+            legend.title = element_blank()) 
+    
+    samphmlist[[samp]][[thresholds]] = hm
+  }
+}
+pdf(file=sprintf("%s_heatmaps.pdf", sampname), width=10, height=6)
+for (samp in samps){
+  grid.arrange(samphmlist[[samp]][["X5_95"]], samphmlist[[samp]][["X15_85"]], samphmlist[[samp]][["X25_75"]], ncol=3, top=samp)
 }
 
-pdf(file=sprintf("%s_heatmaps.pdf", sampname), width=8, height=6)
-
-grid.arrange(hmlist[["X5_95"]], hmlist[["X25_75"]], ncol=2)
-
 dev.off()
-
 
 #~ ORDERING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 comb_cohorts_box = comb_cohorts
 samp_cohorts_box = c()
 for (coh in unique(comb_cohorts$ab)){
   samp_cohorts_box = rbind(samp_cohorts_box, data.frame(samp_cohorts, "ab"=coh))}
+comb_cohorts_box$Var1 = factor(comb_cohorts$Var1, levels=ab_order)
+samp_cohorts_box$Var1 = factor(samp_cohorts_box$Var1, levels=ab_order)
+
 #~ BOXPLOTS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 palette = c("#FF0000FF","#004CFFFF","#00A600FF","#984ea3","#ff7f00","#a65628")
 bp = ggplot(comb_cohorts_box, aes(x=ab, y=value)) + 
@@ -546,6 +561,51 @@ bp = ggplot(comb_cohorts_box, aes(x=ab, y=value)) +
 pdf(file=sprintf("%s_boxplots.pdf", sampname), width=10, height=9)
 print(bp)
 dev.off()
+
+# 
+# #~ ORDERING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Below is commented out because this makes boxplots grouped by pathway but the 
+# facet_wrap might change for this because Chris wants one cohort not multiple, so
+# this will change in the very near future. 
+
+# samp_cohorts_box = c()
+# for (coh in unique(comb_cohorts$ab)){
+#   samp_cohorts_box = rbind(samp_cohorts_box, data.frame(samp_cohorts, "ab"=coh))}
+# #~ BOXPLOTS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# palette = c("#FF0000FF","#004CFFFF","#00A600FF","#984ea3","#ff7f00","#a65628")
+# pwboxlist = list()
+# 
+# 
+# for (pathway in as.character(unique(pathways$Pathway))){
+#   antibodies = as.character(pathways$ab_ref.X.AbID[pathways$Pathway==pathway])
+#   comb_cohorts_box = comb_cohorts[comb_cohorts$Var1 %in% antibodies,]
+#   samp_cohorts_boxab = samp_cohorts_box[samp_cohorts_box$Var1 %in% antibodies,]
+#   bp = ggplot(comb_cohorts_box, aes(x=ab, y=value)) + 
+#     geom_boxplot() +
+#     geom_point(data=samp_cohorts_boxab[samp_cohorts_boxab$detectable==TRUE,], mapping=aes(x=ab, y=newvalue, colour=Var2), shape=8, size=2) +
+#     geom_text(data=samp_cohorts_boxab[samp_cohorts_boxab$detectable==FALSE,], mapping=aes(x=ab, y=newvalue, colour=Var2), label="ND", size=3, position=position_jitter(width=c(0.03))) +
+#     facet_wrap(~Var1, scale="free",nrow=1) +
+#     labs(x="cohort", y="log batch corrected counts", title=sampname) +
+#     scale_color_manual(values=palette[1:length(samps)]) +
+#     theme(panel.background = element_rect(fill = "white"),
+#           panel.grid.major=element_line(colour="gray90"),
+#           plot.title = element_text(hjust = 0.5, vjust=0),
+#           legend.title = element_blank(),
+#           legend.text=element_text(size=9),
+#           legend.position="bottom",
+#           axis.text.x = element_text(size=6, colour=c("black")),
+#           axis.text.y = element_text(size=9, colour="black"))
+#   pwboxlist[[pathway]] = bp
+# }
+# 
+# pdf(file=sprintf("%s_boxplots.pdf", sampname), width=5, height=5)
+# 
+# for (pb in 1:length(pwboxlist)){
+#   pwbox = pwboxlist[[pb]]
+#   print(pwbox + labs(title=paste0(sampname, "\n", names(pwboxlist)[pb])))
+# }
+# 
+# dev.off()
 
 
 #~ HEATMAP #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
