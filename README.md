@@ -4,7 +4,7 @@ Knight Diagnoistics Laboratory
 
 Pipeline is currently run with bash using `run_processing_scripts.sh` which can be run like this: 
 ```
-run_processing_scripts.sh <batch_id>:
+run_processing_scripts.sh <batch_id>
 run_processing_scripts.sh 20190314_208421591020
 
 ```
