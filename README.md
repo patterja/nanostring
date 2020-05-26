@@ -4,7 +4,9 @@ Knight Diagnoistics Laboratory
 
 Pipeline is currently run with bash using `run_processing_scripts.sh` which can be run like this: 
 ```
+run_processing_scripts.sh <batch_id>
 run_processing_scripts.sh 20190314_208421591020
+
 ```
 This process is temporary since KDLs pipelines however are automated through galaxy. each of the steps in this script will likely become a galaxy tool for full automation. 
 
