@@ -58,7 +58,7 @@ echo "finish processing rawdata, moving on to process_batch_qc.R"
 
 #Step 3: if 2_GEOMEAN_NORMALIZED.tsv exists process QC stats for batch pass/fail
 if [ -s 2_GEOMEAN_NORMALIZED.tsv ]; then
-    "${REPO_DIR}""/"process_batch_qc.R -i 2_GEOMEAN_NORMALIZED.tsv --pos_file "${known_pos_file}" --validation_file "${validation2geo_file}" --md_file "${md_file}" --ab_ref_file "${abfile}" 
+    "${REPO_DIR}""/"process_batch_qc.R -i "rawdata.txt" --pos_file "${known_pos_file}" --validation_file "${validationraw_file}" --md_file "${md_file}" --ab_ref_file "${abfile}" 
 else
     echo "something went wrong with making 2_GEOMEAN_NORMALIZED.tsv"
     exit 1

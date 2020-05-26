@@ -12,12 +12,12 @@ suppressPackageStartupMessages(library(xlsx))
 
 ## ARGS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 version="2.0"
-matrix_version = "20200320"
+matrix_version = "20200512"
 
 parser <- ArgumentParser()
-parser$add_argument("-i", help="2_GEOMEAN_NORMALIZED.tsv", dest="input_file")
+parser$add_argument("-i", help="rawdata.txt", dest="input_file")
 parser$add_argument("--validation_file", type="character", 
-                    default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_geosamp_normalized_", matrix_version,".txt"),
+                    default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_rawdata_", matrix_version,".txt"),
                     dest="validation_file", help="validation file for controls comparison")
 parser$add_argument("--pos_file", type="character", 
                     default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/knownpositives.txt"),
@@ -41,11 +41,11 @@ include_bad_Ab = args$include_bad_Ab
 
 
 ## TEST ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-if (!grep("GEO", input_file)){
-  print("Error: The input file is not #3: IGG_SUBTRACTED.tsv")
+if (!grep("raw", input_file)){
+  print("Error: The input file is not: rawdat")
   stop()
-} else if (!grep("geosamp", basename(validation_file))){
-  print("Error: The validation file is not #3: IGG_SUBTRACTED.tsv")
+} else if (!grep("rawdata", basename(validation_file))){
+  print("Error: The validation file is not rawdata.txt")
   stop()
 }
 
@@ -77,14 +77,15 @@ if (include_bad_Ab){
   ab_ref = read.csv(ab_ref_file, sep=",", stringsAsFactors=F)
   
   # NEW BATCH
-  new_batch = data.matrix(read.table(file = input_file, sep="\t", row.names=1, stringsAsFactors=F, header=T))
+  new_batch = read.table(file = input_file, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
+  new_batch[,c("CodeClass", "Accession")] <- NULL
   lnew_batch = log2(new_batch+1)
   
   #AB_ORDER
   ab_order = ab_ref$X.AbID[order(ab_ref$Target)]
   
 } else {
-  omit = c("p-TSC2", "TSC2", "NEG")
+  omit = c("p-TSC2", "TSC2", "NEG","POS")
   omitregex = paste0(paste0("^", omit), collapse = "|")
   
   #validation file
@@ -97,7 +98,8 @@ if (include_bad_Ab){
   ab_ref = ab_ref[!grepl(omitregex, ab_ref$X.AbID),]
   
   #NEW BATCH
-  new_batch = data.matrix(read.table(file = input_file, sep="\t", row.names=1, stringsAsFactors=F, header=T))
+  new_batch = read.table(file = input_file, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
+  new_batch[,c("CodeClass", "Accession")] <- NULL
   new_batch = new_batch[!grepl(omitregex, rownames(new_batch)),]
   lnew_batch = log2(new_batch+1)
 
@@ -132,7 +134,7 @@ validation_stats = data.frame(
 # NEWBATCH CONTROLS  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #only use controls 
-ctl_newbatch = melt(lnew_batch[,make.names(controls)])
+ctl_newbatch = melt(as.matrix(lnew_batch[,make.names(controls)]))
 ctl_newbatch$ctl_ab = paste0(ctl_newbatch$Var2,"__", ctl_newbatch$Var1)
 ctl_newbatch$cellline = ctl_newbatch$Var2
 
@@ -140,13 +142,14 @@ ctl_newbatch$cellline = ctl_newbatch$Var2
 
 ctl_validation =cbind(validation_stats, "new_batch"=ctl_newbatch[match(rownames(validation_stats),ctl_newbatch$ctl_ab), "value"])
 ctl_validation$status = ifelse(ctl_validation$new_batch < ctl_validation$mean.minus.2sd, 
-                               (ctl_validation$mean - ctl_validation$new_batch)/ctl_validation$stddev, 
+                               (ctl_validation$new_batch - ctl_validation$mean)/ctl_validation$stddev, 
                                ifelse(ctl_validation$new_batch >= ctl_validation$mean.plus.2sd, 
                                       (ctl_validation$new_batch - ctl_validation$mean)/ctl_validation$stddev, "PASS"))
 
 # KNOWN POSITIVES  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 pos_validation = cbind(pos, ctl_validation[rownames(pos),])
-
+ctl_validation$cellline = sapply(strsplit(as.character(rownames(ctl_validation)), "__"), `[`, 1)
+ctl_validation$antibody = sapply(strsplit(as.character(rownames(ctl_validation)), "__"), `[`, 2)
 write.table(ctl_validation, file = "qc_controls.tsv", 
             sep="\t", quote = F, row.names = T, col.names = NA)
 
