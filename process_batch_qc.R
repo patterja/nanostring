@@ -8,7 +8,7 @@ suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(reshape2))
 suppressPackageStartupMessages(library(gridExtra))
 suppressPackageStartupMessages(library(xlsx))
-
+suppressPackageStartupMessages(library(jsonlite))
 
 ## ARGS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 version="2.0"
@@ -66,6 +66,14 @@ pos = read.csv(pos_file, sep= "\t", row.names = 3, check.names = F)
 md = read.xlsx(file=md_file, sheetName = "nanostring_metadata", check.names=F)
 md$combined_name = paste0(md$Batch, "__", md$`Sample Name`)
 
+#rawdata
+new_batch = read.table(file = input_file, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
+new_batch[,c("CodeClass", "Accession")] <- NULL
+## ERCC POS DATA ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ercc=new_batch[grepl("POS", rownames(new_batch)),]
+ercc_conc =  gsub("[^0-9.]", "",  rownames(ercc))
+rsq = (cor(as.numeric(ercc_conc), ercc))^2
+write_json(rsq, "ercc _rsquared.json")
 
 if (include_bad_Ab){
   print("keeping all antibodies: IgG and antibodies that did not perform well or did not have dynamic range")
@@ -77,8 +85,7 @@ if (include_bad_Ab){
   ab_ref = read.csv(ab_ref_file, sep=",", stringsAsFactors=F)
   
   # NEW BATCH
-  new_batch = read.table(file = input_file, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
-  new_batch[,c("CodeClass", "Accession")] <- NULL
+  
   lnew_batch = log2(new_batch+1)
   
   #AB_ORDER
@@ -98,8 +105,6 @@ if (include_bad_Ab){
   ab_ref = ab_ref[!grepl(omitregex, ab_ref$X.AbID),]
   
   #NEW BATCH
-  new_batch = read.table(file = input_file, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
-  new_batch[,c("CodeClass", "Accession")] <- NULL
   new_batch = new_batch[!grepl(omitregex, rownames(new_batch)),]
   lnew_batch = log2(new_batch+1)
 
@@ -147,6 +152,8 @@ ctl_validation$status = ifelse(ctl_validation$new_batch < ctl_validation$mean.mi
                                       (ctl_validation$new_batch - ctl_validation$mean)/ctl_validation$stddev, "PASS"))
 
 # KNOWN POSITIVES  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
 pos_validation = cbind(pos, ctl_validation[rownames(pos),])
 ctl_validation$cellline = sapply(strsplit(as.character(rownames(ctl_validation)), "__"), `[`, 1)
 ctl_validation$antibody = sapply(strsplit(as.character(rownames(ctl_validation)), "__"), `[`, 2)
