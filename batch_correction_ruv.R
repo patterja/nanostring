@@ -10,7 +10,7 @@ suppressPackageStartupMessages(library(pheatmap))
 suppressPackageStartupMessages(library(reshape2))
 suppressPackageStartupMessages(library(ruv))
 suppressPackageStartupMessages(library(xlsx))
-suppressPackageStartupMessages(library(nanostring))
+suppressPackageStartupMessages(library(nanoprot))
 suppressPackageStartupMessages(library(gridExtra))
 
 ## ARGS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -64,7 +64,7 @@ md$sampcolumn = make.names(paste0(md$Batch, "__", md$Sample.Name))
 validation = read.csv(validation_file, sep= "\t", row.names = 1, check.names = T)
 
 #ihc status
-ihc = read.csv(ihc_file, sep= "\t", row.names = 1, check.names = T)
+ihc = read.csv(ihc_file, sep= "\t", check.names = T)
 ihc$sampcolumn = make.names(paste0(ihc$Batch, "__", ihc$Sample.Name))
 
 #remove ihc duplicates
@@ -132,7 +132,7 @@ for (samp in setdiff(colnames(new_batch), controls)) {
   lctls = lctls[!make.names(rownames(lctls)) %in% ab.ctrl, comb_md$sampcolumn[comb_md$samp %in% controls]]
   limits_rle_raw = max(as.matrix(lctls))-median(as.matrix(lctls))
   # RUV 
-  ctl_ruv = t(RUVcorrected)[, comb_md$sampcolumn[comb_md$samp %in% controls]]
+  ctl_ruv = t(ruvmat)[, comb_md$sampcolumn[comb_md$samp %in% controls]]
   limits_rle_ruv = max(as.matrix(ctl_ruv))-median(as.matrix(ctl_ruv))
   
   # RLE BOXPLOTS
@@ -161,7 +161,8 @@ for (samp in setdiff(colnames(new_batch), controls)) {
     ggtitle(paste0("Relative Log Expression Batch Corrected\n", samp))
   
   
-  # NORMAL HEATMAP
+  # signal HEATMAP
+  pdf(paste0("ruv_figures/",samp,"_signal_heatmap.pdf"), width = 7, height = 8)
   rownames(comb_md) = comb_md$sampcolumn
   pheat_raw = pheatmap(mat = t(lctls),
     color             = colorRampPalette(c("green", "black", "red"))(50),
@@ -176,7 +177,6 @@ for (samp in setdiff(colnames(new_batch), controls)) {
     main              = "log raw", 
     cluster_rows      = T,
     cluster_cols      = T)
-  dev.off()
   
   ## NORMAL ruv
   pheat_ruv = pheatmap(mat = t(ctl_ruv),
@@ -189,28 +189,14 @@ for (samp in setdiff(colnames(new_batch), controls)) {
                        fontsize          = 8,
                        fontsize_row      = 5,
                        fontsize_col      = 5,
-                       main              = "log raw", 
-                       cluster_rows      = T,
-                       cluster_cols      = T)
-  # RLE HEATMAP
-  rownames(comb_md) = comb_md$sampcolumn
-  pheat_raw = pheatmap(mat = t(lctls),
-                       color             = colorRampPalette(c("green", "black", "red"))(50),
-                       border_color      = NA,
-                       show_colnames     = TRUE,
-                       show_rownames     = TRUE,
-                       annotation_row    = comb_md[colnames(lctls),c("reps"), drop=F], 
-                       drop_levels       = TRUE,
-                       fontsize          = 8,
-                       fontsize_row      = 5,
-                       fontsize_col      = 5,
-                       main              = "log raw", 
+                       main              = "RUV batch corrected signal", 
                        cluster_rows      = T,
                        cluster_cols      = T)
   dev.off()
   
-  ## rle ruv
-  pheat_ruv = pheatmap(mat = t(ctl_ruv),
+  # RLE HEATMAP
+  pdf(paste0("ruv_figures/",samp,"_RLE_heatmap.pdf"), width = 7, height = 8)
+  pheat_raw = pheatmap(mat = rel_log_exp(t(lctls)),
                        color             = colorRampPalette(c("green", "black", "red"))(50),
                        border_color      = NA,
                        show_colnames     = TRUE,
@@ -220,9 +206,26 @@ for (samp in setdiff(colnames(new_batch), controls)) {
                        fontsize          = 8,
                        fontsize_row      = 5,
                        fontsize_col      = 5,
-                       main              = "log raw", 
+                       main              = "RLE of log raw ", 
                        cluster_rows      = T,
                        cluster_cols      = T)
+  
+  ## rle ruv
+  pheat_ruv = pheatmap(mat = rel_log_exp(t(ctl_ruv)),
+                       color             = colorRampPalette(c("green", "black", "red"))(50),
+                       border_color      = NA,
+                       show_colnames     = TRUE,
+                       show_rownames     = TRUE,
+                       annotation_row    = comb_md[colnames(lctls),c("reps"), drop=F], 
+                       drop_levels       = TRUE,
+                       fontsize          = 8,
+                       fontsize_row      = 5,
+                       fontsize_col      = 5,
+                       main              = "RLE of RUV batch corrected", 
+                       cluster_rows      = T,
+                       cluster_cols      = T)
+  dev.off()
+  
   #~ pca
   pca_raw = pcaplot(mat = lctls, 
                     title="Normalized, Pre-RUV", 
@@ -273,12 +276,6 @@ for (samp in setdiff(colnames(new_batch), controls)) {
   print(rle_ruv)
   dev.off()
   
-  pdf(paste0("ruv_figures/",samp,"_RLE_heatmap.pdf"), width = 7, height = 8)
-  grid::grid.newpage()
-  grid::grid.draw(pheat_raw)
-  grid::grid.newpage()
-  grid::grid.draw(pheat_ruv)
-  dev.off()
   
   pdf(paste0("ruv_figures/",samp,"_PCA.pdf"), width = 8, height = 8)
   print(pca_raw)

@@ -9,11 +9,11 @@ suppressPackageStartupMessages(library(reshape2))
 suppressPackageStartupMessages(library(pheatmap))
 suppressPackageStartupMessages(library(xlsx))
 suppressPackageStartupMessages(library(ruv))
-suppressPackageStartupMessages(library(nanostring))
+suppressPackageStartupMessages(library(nanoprot))
 suppressPackageStartupMessages(library(gridExtra))
 
 version="4.0"
-mat_version = "20200320"
+mat_version = "20200512"
 ihc_version = "20200507"
 
 parser <- ArgumentParser()
