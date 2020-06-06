@@ -149,13 +149,13 @@ def main():
     # Check header and samp_attribs
 
     for idx in range(1, len(header_dict)):
-        if header_dict.values()[idx - 1] != header_dict.values()[idx]:
+        if list(header_dict.values())[idx - 1] != list(header_dict.values())[idx]:
             print("RCC header are not equal")
             # print(header_dict.values()[idx])
 
     # test to see if samp_attribs are all the same, all RCC files are from same run
     for idx in range(1, len(samp_attrib_dict)):
-        if samp_attrib_dict.values()[idx - 1] != samp_attrib_dict.values()[idx]:
+        if list(samp_attrib_dict.values())[idx - 1] != list(samp_attrib_dict.values())[idx]:
             print("RCC Sample Attributes are not equal")
             # print(samp_attrib_dict.values()[idx])
             if samp_attrib_dict.values()[idx][0][1:] == samp_attrib_dict.values()[idx][0][1:]:
@@ -175,10 +175,10 @@ def main():
                                   lane_attrib_dict.values())
 
     with open("run_metrics.txt", 'w') as met:
-        for item in header_dict.values()[0]:
+        for item in list(header_dict.values())[0]:
             met.write('\t'.join(item))
             met.write('\n')
-        for item in samp_attrib_dict.values()[0]:
+        for item in list(samp_attrib_dict.values())[0]:
             met.write('\t'.join(item))
             met.write('\n')
         met.write(lane_attrib_combined.to_csv(sep="\t"))
