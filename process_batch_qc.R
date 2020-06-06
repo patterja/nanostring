@@ -69,11 +69,15 @@ md$combined_name = paste0(md$Batch, "__", md$`Sample Name`)
 #rawdata
 new_batch = read.table(file = input_file, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
 new_batch[,c("CodeClass", "Accession")] <- NULL
+if (!any(make.names(controls) %in% colnames(new_batch))){
+  stop("no controls in this batch")
+}
+
 ## ERCC POS DATA ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ercc=new_batch[grepl("POS", rownames(new_batch)),]
-ercc_conc =  gsub("[^0-9.]", "",  rownames(ercc))
-rsq = (cor(as.numeric(ercc_conc), ercc))^2
-write_json(rsq, "ercc _rsquared.json")
+ercc_conc =  as.numeric(gsub("[^0-9.]", "",  rownames(ercc)))
+rsq = as.list(apply(ercc, 2, function(x) (cor(x, ercc_conc))^2))
+write_json(rsq, "ercc _rsquared.json",simplifyVector = FALSE, simplifyDataFrame = FALSE)
 
 if (include_bad_Ab){
   print("keeping all antibodies: IgG and antibodies that did not perform well or did not have dynamic range")
@@ -153,10 +157,10 @@ ctl_validation$status = ifelse(ctl_validation$new_batch < ctl_validation$mean.mi
 
 # KNOWN POSITIVES  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-pos_validation = cbind(pos, ctl_validation[rownames(pos),])
 ctl_validation$cellline = sapply(strsplit(as.character(rownames(ctl_validation)), "__"), `[`, 1)
 ctl_validation$antibody = sapply(strsplit(as.character(rownames(ctl_validation)), "__"), `[`, 2)
+pos_validation = cbind(pos, ctl_validation[rownames(pos),])
+
 write.table(ctl_validation, file = "qc_controls.tsv", 
             sep="\t", quote = F, row.names = T, col.names = NA)
 
