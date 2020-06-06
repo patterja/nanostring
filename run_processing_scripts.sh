@@ -9,8 +9,11 @@
 ##
 set -e
 
-valid_version="20200320"
+valid_version="20200512"
 ihc_version="20200507"
+knownpos_version="1.0"
+antibody_version="1.0"
+
 #cd "/Users/patterja/Box\ Sync/NANOSTRING/data/${smmart}"
 NEWBATCH=$(basename "$1")
 echo $NEWBATCH
@@ -21,10 +24,10 @@ ss_dir="${DATA_DIR}""/""automated_data/""$NEWBATCH"
 output_dir="${DATA_DIR}""/""output/""$NEWBATCH"
 #files
 FILES=("${DATA_DIR}""/""automated_data/"$NEWBATCH"/*RCC")
-abfile="${DATA_DIR}""/""REFERENCE_FILES/ANTIBODY_REFERENCE.csv"
-known_pos_file="${DATA_DIR}""/""REFERENCE_FILES/knownpositives.txt"
-#validation3igg_file="${DATA_DIR}""/""REFERENCE_FILES/validation_samples_iggsub_normalized_20200320.txt"
-validation2geo_file="${DATA_DIR}""/""REFERENCE_FILES/validation_samples_geosamp_normalized_"${valid_version}".txt"
+abfile="${DATA_DIR}""/""REFERENCE_FILES/ANTIBODY_REFERENCE_v"${antibody_version}".csv"
+known_pos_file="${DATA_DIR}""/""REFERENCE_FILES/knownpositives_v"${knownpos_version}".txt"
+#validation3igg_fle="${DATA_DIR}""/""REFERENCE_FILES/validation_samples_iggsub_normalized_20200320.txt"
+#validation2geo_file="${DATA_DIR}""/""REFERENCE_FILES/validation_samples_geosamp_normalized_"${valid_version}".txt"
 validationraw_file="${DATA_DIR}""/""REFERENCE_FILES/validation_samples_rawdata_"${valid_version}".txt"
 ihc_file="${DATA_DIR}""/""REFERENCE_FILES/ihc_status_"${ihc_version}".txt"
 md_file="/Users/patterja/Box Sync/NANOSTRING/nanostring_metadata.xlsx"
@@ -40,7 +43,7 @@ if test -f "$ss"; then
     echo "dir made"
     cd "${output_dir}" 
     echo `pwd`
-    "${REPO_DIR}""/"process_rcc.py --samplesheet "$ss" --abfile "${abfile}" ${FILES[@]}
+    python3 "${REPO_DIR}""/"process_rcc.py --samplesheet "$ss" --abfile "${abfile}" ${FILES[@]}
 else
     echo "no samplesheet"
     exit 1
@@ -48,7 +51,7 @@ fi
 
 #Step 2: if rawdata.txt exists run per batch scaling 
 if [ -s rawdata.txt ]; then
-    "${REPO_DIR}""/"norm_nanostring.py --rawdata "rawdata.txt" --abfile "${abfile}"
+    python3 "${REPO_DIR}""/"norm_nanostring.py --rawdata "rawdata.txt" --abfile "${abfile}"
 else
     echo "something went wrong with processing rawdata.txt"
     exit 1
@@ -56,11 +59,11 @@ fi
 
 echo "finish processing rawdata, moving on to process_batch_qc.R"
 
-#Step 3: if 2_GEOMEAN_NORMALIZED.tsv exists process QC stats for batch pass/fail
-if [ -s 2_GEOMEAN_NORMALIZED.tsv ]; then
+#Step 3: if rawdata.txt exists process QC stats for batch pass/fail
+if [ -s rawdata.txt ]; then
     "${REPO_DIR}""/"process_batch_qc.R -i "rawdata.txt" --pos_file "${known_pos_file}" --validation_file "${validationraw_file}" --md_file "${md_file}" --ab_ref_file "${abfile}" 
 else
-    echo "something went wrong with making 2_GEOMEAN_NORMALIZED.tsv"
+    echo "something went wrong with making rawdata.txt"
     exit 1
 fi
 

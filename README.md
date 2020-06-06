@@ -2,15 +2,22 @@
 
 Knight Diagnoistics Laboratory
 
-Pipeline is currently run with bash using `run_processing_scripts.sh` which can be run like this: 
+Pipeline is currently run locally on 
+Platform: x86_64-apple-darwin 15.6.0 (64-bit)
+R version 3.5.2 (2018-12-20)
+Python version Python 3.7.7
+
+Bash pipeline script using `run_processing_scripts.sh` which can be run like this:
 ```
 run_processing_scripts.sh <batch_id>
 run_processing_scripts.sh 20190314_208421591020
 
 ```
-This process is temporary since KDLs pipelines however are automated through galaxy. each of the steps in this script will likely become a galaxy tool for full automation. 
 
-Current R processing scripts have dependency of nanostring package. This is a minimal package at the moment which contains only a couple functions. However there is the potential to extend this and simplify some of these processing scripts. 
+Current R processing scripts have dependency of custom nanoprot package. 
+[nanoprot](https://github.com/patterja/nanoprot)
+
+This is a minimal package at the moment which contains only a three functions for plotting PCA and calculating RLE. However there to extend this and simplify some of these processing scripts by transferring all the plotting functions here. 
 
 Scripts are dependent on multiple files:
 
@@ -50,11 +57,11 @@ HeyA8   ERK1/2  HeyA8__ERK1/2
 ...
 ```  
 
-### validation_samples_geosamp_normalized_<valid_version>.txt
-Matrix of geomean scaled by each batch. This is only used for batch pass and fail. Scaled within each batch to see if batch is consistent with this version of the cohort summarized in this matrix. 
+### validation_samples_rawdata_<valid_version>.txt
+Matrix of rawdata for 20 batches run as a validation set. This is only used for batch pass and fail. 
+Rows are features: ERCC controls, antibodies, etc
+Columns are samples: labeled in the form of <batch_name>_<sample_name>
 
-valid_version=20200320
-need to update this 
 ```
 20190314_208421591020__HCC1954  20190314_208421591020__BT474    20190314_208421591020__MDA468 control.1	20190314_208421591020__BT474.1    20190314_208421591020__MCF7.1
 POS_B(32)	4257	5345	3822	4183	3561	
@@ -66,9 +73,8 @@ Histone H3	92664	50931	116502	91911	306272
 ```
 
 ### ihc_status_<ihc_version>.txt
-IHC metadata matrix. This is a matrix of the IHC status and will contain cohort information for data visualization and sub grouping into cohorts. Initially created from LabKey API but some samples in the cohort were not SMMART were annotated manually from EPIC. This will need to be updated manaully I think. Is there an API for EPIC?
+IHC metadata matrix. This is a matrix of the IHC status and will contain cohort information for data visualization and sub grouping into cohorts. Initially created from LabKey API but some samples in the cohort were not SMMART were annotated manually from EPIC. This will need to be updated manaully I think. 
 
-ihc_version="20200507"
 ```
 index	Batch	Batch Name	RCC Filename	Sample Name	BEMS ID	Participant ID	Collection Date	Biopsy	Antibody Lot	Study	cohort	HER2	ER	PR	TNBC	AR	Ki-67	BCL-2	PD-L1	GATA-3	19	20	CK7	BEMS ID	Collection Date	Pathology Record Number
 1	20190320_208421541020	SMMART2	20190320_208421541020_SMMART set#2-032019_12.RCC	PATHID#1	BEMSID#1	SMMARTIRBID#1	BIOPSYDATE#1	1	STP10004F	AMTEC	breast	NA	NA	NA	FALSE	NA	NA	NA	NA	NA	NANA	NA
@@ -78,7 +84,7 @@ index	Batch	Batch Name	RCC Filename	Sample Name	BEMS ID	Participant ID	Collectio
 
 ### nanostring_metadata.xlsx
 
-Keeping this as an excel because it's accessed too much and filled manually. See Box Directory/NANOSTRING/nanostring_metadata.xlsx
+Keeping this as an excel. See Box Directory/NANOSTRING/nanostring_metadata.xlsx
 
 ```
 Batch	Batch Name	RCC Filename	Sample Name	BEMS ID	Participant ID	Collection Date	Biopsy	Antibody Lot	Study	cohort
