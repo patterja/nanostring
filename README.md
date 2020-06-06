@@ -2,10 +2,10 @@
 
 Knight Diagnoistics Laboratory
 
-Pipeline is currently run locally on 
-Platform: x86_64-apple-darwin 15.6.0 (64-bit)
-R version 3.5.2 (2018-12-20)
-Python version Python 3.7.7
+Pipeline is currently run locally
+ - Platform: x86_64-apple-darwin 15.6.0 (64-bit)
+ - R version 3.5.2 (2018-12-20)
+ - Python version Python 3.7.7
 
 Bash pipeline script using `run_processing_scripts.sh` which can be run like this:
 ```
@@ -84,7 +84,7 @@ index	Batch	Batch Name	RCC Filename	Sample Name	BEMS ID	Participant ID	Collectio
 
 ### nanostring_metadata.xlsx
 
-Keeping this as an excel. See Box Directory/NANOSTRING/nanostring_metadata.xlsx
+Keeping this in excel. See Box Directory/NANOSTRING/nanostring_metadata.xlsx
 
 ```
 Batch	Batch Name	RCC Filename	Sample Name	BEMS ID	Participant ID	Collection Date	Biopsy	Antibody Lot	Study	cohort
