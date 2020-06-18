@@ -27,7 +27,7 @@ parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box
                     dest="md_file", help="metadata file")
 parser$add_argument("--ihc_file", type="character", default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ihc_status_", ihc_version, ".txt"),
                     dest="ihc_file", help="ihc file")
-parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE.csv",
+parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE_v1.0.csv",
                     dest="ab_ref_file", help="ANTIBODY_REFERENCE.csv")
 parser$add_argument("--include_ctrls", action="store_true", default=FALSE,
                     dest="include_ctrls", help="include all antibodies")
@@ -78,6 +78,11 @@ cohs = list(BC_preTx = ihc$sampcolumn[ihc$cohort=="breast" & ihc$TNBC=="FALSE"],
 
 # antibody metadata
 ab_ref = read.csv(ab_ref_file, sep=",", stringsAsFactors=F)
+pathways = data.frame(ab_ref$X.AbID, Pathway = sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 1))
+pathways = rbind(pathways, data.frame(ab_ref$X.AbID, Pathway=sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 2)))
+pathways = rbind(pathways, data.frame(ab_ref$X.AbID, Pathway=sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 3)))
+
+pathways = pathways[complete.cases(pathways),]
 
 # NEW BATCH
 new_batch = read.table(file = input_file, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)

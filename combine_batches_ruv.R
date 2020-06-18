@@ -26,7 +26,7 @@ parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box
                     dest="mbc_md_file", help="metastatic breast cancer metadata file")
 parser$add_argument("--ihc_file", type="character", default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ihc_status_", ihc_version, ".txt"),
                     dest="ihc_file", help="ihc file")
-parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE.csv",
+parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE_v1.0.csv",
                     dest="ab_ref_file", help="ANTIBODY_REFERENCE.csv")
 parser$add_argument("--include_ctrls", action="store_true", default=FALSE,
                     dest="include_ctrls", help="include all antibodies")
@@ -52,19 +52,17 @@ ab.ctrl = "IgG|POS|NEG|^S6|^Histone"
 #FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #todo: add these nanostring package
 # ~ functions for pairs plot for
-panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+panel.cor <- function(x, y){
   #' @param x: vector of numbers
   #' @param y: vector of numbers
-  #' @return plot
-{
+  #' @return text for plotting
   usr <- par("usr"); on.exit(par(usr))
   par(usr = c(0, 1, 0, 1))
-  r <- abs(cor(x, y))
-  txt <- format(c(r, 0.123456789), digits = digits)[1]
-  txt <- paste0(prefix, txt)
-  if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
-  text(0.5, 0.5, txt, cex = cex.cor * r)
+  r <- round(cor(x, y), digits=2)
+  txt <- paste0("R = ", r)
+  text(0.5, 0.5, txt)
 }
+
 scatter_line <- function(x,y,...){
   #' @param x: vector of numbers
   #' @param y: vector of numbers
@@ -92,14 +90,16 @@ md$sampcolumn = make.names(paste0(md$Batch, "__", md$Sample.Name))
 ab_ref = read.csv(ab_ref_file, sep=",", stringsAsFactors=F)
 pathways = data.frame(ab_ref$X.AbID, Pathway = sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 1))
 pathways = rbind(pathways, data.frame(ab_ref$X.AbID, Pathway=sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 2)))
+pathways = rbind(pathways, data.frame(ab_ref$X.AbID, Pathway=sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 3)))
+
 pathways = pathways[complete.cases(pathways),]
 
 #~ validation
 validation = read.csv(validation_file, sep= "\t", row.names = 1, check.names = T)
 
 #ihc status 
-ihc = read.csv(ihc_file, sep= "\t", row.names = 1, check.names = T)
-ihc$sampcolumn = paste0(ihc$Batch, "__", ihc$Sample.Name)
+ihc = read.csv(ihc_file, sep= "\t", check.names = T)
+ihc$sampcolumn = make.names(paste0(ihc$Batch, "__", ihc$Sample.Name))
 
 #remove ihc duplicates and make cohorts samples ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 root_name = sapply(strsplit(as.character(ihc$Sample.Name), "\\s+"), `[`, 1)
@@ -122,7 +122,7 @@ for (f in 1:length(unique(samps2batchcorr$Batch))){
     batch = read.table(file = file_name, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
   } else {
     
-    stop(sprintf("Batch QC failed do not analyze! Batch %s", batch_name))
+    stop(sprintf("Batch QC failed. No rawdata.txt file exists! Batch %s", batch_name))
   }
   batch[,c("CodeClass", "Accession")] <- NULL
   
@@ -333,14 +333,28 @@ for (ctrl in make.names(controls)){
 }
 
 tra_btwn_batch = matrix(NA, nrow = 0, ncol = 4)
-allselraw = t(combined_raw[!grepl("POS|NEG", rownames(lcombined)),samps])
-allselraw = t(exp(bcdat[,samps]))
-for (r in 1:(length(samps)-1)){
-  print(r)
-  selraw = log(sweep(as.matrix(allselraw[-r,,drop=F]), 2, as.numeric(allselraw[r,,drop=F]), `/`))
-  selruv = log(sweep(as.matrix(allselraw[-r,,drop=F]), 2, as.numeric(allselraw[r,,drop=F]), `/`))
-  tra_btwn_batch = rbind(tra_btwn_batch, data.frame(melt(as.matrix(selraw)), "sample"="raw"))
-  tra_btwn_batch = rbind(tra_btwn_batch, data.frame(melt(as.matrix(selruv)), "sample"="ruv"))
+
+allselraw = t(combined_raw[!grepl("POS|NEG", rownames(lcombined)),samp_celllines])
+allselruv = t(exp(bcdat[,samp_celllines]))
+
+for (ctrl in make.names(controls)){
+  #get matrix of celllines for controls not including batches of interest
+  valid.ctrl_names = samp_celllines[grep(ctrl, samp_celllines)]
+  if (length(valid.ctrl_names)==1){
+    selv.ctrl_raw = rbind(allselraw[valid.ctrl_names,, drop=F],allselraw[valid.ctrl_names,, drop=F])
+    selv.ctrl_ruv = rbind(allselruv[valid.ctrl_names,, drop=F],allselruv[valid.ctrl_names,, drop=F])
+  } else{
+    selv.ctrl_raw = allselraw[valid.ctrl_names,, drop=F]
+    selv.ctrl_ruv = allselruv[valid.ctrl_names,, drop=F]
+  }
+  tra_ctrlraw =c()
+  tra_ctrlruv =c()
+  for (r in 1:nrow(selv.ctrl_ruv)){
+    tra_ctrlraw = rbind(tra_ctrlraw, log(sweep(as.matrix(selv.ctrl_raw[-r,,drop=F]), 2, as.numeric(selv.ctrl_raw[r,,drop=F]), `/`)))
+    tra_ctrlruv = rbind(tra_ctrlruv, log(sweep(as.matrix(selv.ctrl_ruv[-r,,drop=F]), 2, as.numeric(selv.ctrl_ruv[r,,drop=F]), `/`)))
+  }
+  tra_btwn_batch = rbind(tra_btwn_batch, data.frame(melt(as.matrix(tra_ctrlraw)), "sample"="raw"))
+  tra_btwn_batch = rbind(tra_btwn_batch, data.frame(melt(as.matrix(tra_ctrlruv)), "sample"="ruv"))
 }
 
 ptra=ggplot(tra, aes(x=sample, y=value, fill=sample)) + 
@@ -354,7 +368,7 @@ ptra=ggplot(tra, aes(x=sample, y=value, fill=sample)) +
 ptra_btwn=ggplot(tra_btwn_batch, aes(x=sample, y=value, fill=sample)) + 
   geom_boxplot() +
   geom_hline(yintercept =0, color="red") +
-  labs(title=paste0("Distribution of TRA between RAW and RUV Corrected between samplesheet batches\n"),
+  labs(title=paste0("Distribution of TRA between RAW and RUV Corrected between Controls of Batches being compared\n"),
        y="log(validation count/new batch count)") +
   theme(legend.position = "bottom")
 
@@ -362,9 +376,9 @@ ptra_btwn=ggplot(tra_btwn_batch, aes(x=sample, y=value, fill=sample)) +
 
 
 print("saving batch correction plots")
-pdf(file=paste0("qc_figures/",sampname,"_TRA.png"), width = 8, height = 8)
-print(plot(ptra))
-print(plot(ptra_btwn))
+pdf(file=paste0("qc_figures/",sampname,"_TRA.pdf"), width = 8, height = 8)
+print(ptra)
+print(ptra_btwn)
 dev.off()
 
 pdf(paste0("qc_figures/",sampname,"_RLE_boxplots.pdf"), width = 8, height = 4)
@@ -436,12 +450,13 @@ for (cidx in seq(1:length(unique(comb_cohorts$ab)))){
 ## if signal above do nothing
 samp_cohorts['detectable']=TRUE
 for (samp in samps){
-  newsamp = lcombined[,samp, drop=F]
+  newsamp = combined_raw[,samp, drop=F]
+  #newsamp = lcombined[,samp, drop=F]
   rbigg = newsamp[which(rownames(newsamp)=="RbAb-IgG"),]
   mmigg = newsamp[which(rownames(newsamp)=="MmAb-IgG1"),]
   for (i in seq(1:length(ab_order))){
     ab = (ab_order)[i]
-    idx = which(samp_cohorts$Var1==ab)
+    idx = which(samp_cohorts$Var1==ab & samp_cohorts$Var2==samp)
     minval = min(as.numeric(comb_cohorts[comb_cohorts$Var1==ab, "value"]), na.rm=T)-1
     
     if (ab_ref$Host[which(ab_ref$X.AbID==ab)]=="rabbit"){
@@ -467,8 +482,8 @@ for (samp in samps){
 thresh=data.frame("5_95"=c("5%", "95%"), "15_85"=c("15%", "85%"), "25_75"=c("25%","75%"), stringsAsFactors = F)
 cohorder = c()
 for (cidx in seq(1:length(coh_percs))){
-  print(names(coh_percs)[cidx])
   coh = names(coh_percs)[cidx]
+  print(coh)
   for (ab in unique(comb_cohorts$Var1)){
     #print(ab)
     cohtemp = coh_percs[[coh]][ab,]
@@ -501,12 +516,12 @@ msamp$names = paste0(msamp$cohortnames,"__", msamp$sampnames)
 samphmlist <- list()
 for (samp in samps){
   for (thresholds in colnames(thresh)){
-    mmsamp = msamp[grepl(thresholds, msamp$variable),]
+    mmsamp = msamp[grepl(thresholds, msamp$variable) & msamp$Var2==samp,]
     mmsamp$Var1 = factor(mmsamp$Var1, levels=ab_order)
     #mmsamp$discrete_ab = as.numeric(factor(mmsamp$Var1))
     mmsamp$cohortnames = factor(mmsamp$cohortnames, levels = unique(mmsamp$cohortnames))
     hm= ggplot(mmsamp) +
-      geom_tile(aes(x=names, y=cohortnames, fill=factor(value)),colour = "grey50") +
+      geom_tile(aes(x=cohortnames, y=Var1, fill=factor(value)),colour = "grey50") +
       scale_fill_manual(values=c("indeterminate"="white", "ND"="black","low"="yellow","high"="blue")) +
       scale_x_discrete(name ="Cohort", breaks = mmsamp$cohortnames, labels = mmsamp$names) +
       #scale_y_continuous(breaks=mmsamp$discrete_ab, label=mmsamp$Var1, sec.axis = sec_axis(~.,breaks = mmsamp$discrete_ab,labels = round(mmsamp$rat, 1), name=paste0("Ratio of Biopsies: ", rationame)))+
@@ -562,62 +577,19 @@ pdf(file=sprintf("%s_boxplots.pdf", sampname), width=10, height=9)
 print(bp)
 dev.off()
 
-# 
-# #~ ORDERING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Below is commented out because this makes boxplots grouped by pathway but the 
-# facet_wrap might change for this because Chris wants one cohort not multiple, so
-# this will change in the very near future. 
-
-# samp_cohorts_box = c()
-# for (coh in unique(comb_cohorts$ab)){
-#   samp_cohorts_box = rbind(samp_cohorts_box, data.frame(samp_cohorts, "ab"=coh))}
-# #~ BOXPLOTS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# palette = c("#FF0000FF","#004CFFFF","#00A600FF","#984ea3","#ff7f00","#a65628")
-# pwboxlist = list()
-# 
-# 
-# for (pathway in as.character(unique(pathways$Pathway))){
-#   antibodies = as.character(pathways$ab_ref.X.AbID[pathways$Pathway==pathway])
-#   comb_cohorts_box = comb_cohorts[comb_cohorts$Var1 %in% antibodies,]
-#   samp_cohorts_boxab = samp_cohorts_box[samp_cohorts_box$Var1 %in% antibodies,]
-#   bp = ggplot(comb_cohorts_box, aes(x=ab, y=value)) + 
-#     geom_boxplot() +
-#     geom_point(data=samp_cohorts_boxab[samp_cohorts_boxab$detectable==TRUE,], mapping=aes(x=ab, y=newvalue, colour=Var2), shape=8, size=2) +
-#     geom_text(data=samp_cohorts_boxab[samp_cohorts_boxab$detectable==FALSE,], mapping=aes(x=ab, y=newvalue, colour=Var2), label="ND", size=3, position=position_jitter(width=c(0.03))) +
-#     facet_wrap(~Var1, scale="free",nrow=1) +
-#     labs(x="cohort", y="log batch corrected counts", title=sampname) +
-#     scale_color_manual(values=palette[1:length(samps)]) +
-#     theme(panel.background = element_rect(fill = "white"),
-#           panel.grid.major=element_line(colour="gray90"),
-#           plot.title = element_text(hjust = 0.5, vjust=0),
-#           legend.title = element_blank(),
-#           legend.text=element_text(size=9),
-#           legend.position="bottom",
-#           axis.text.x = element_text(size=6, colour=c("black")),
-#           axis.text.y = element_text(size=9, colour="black"))
-#   pwboxlist[[pathway]] = bp
-# }
-# 
-# pdf(file=sprintf("%s_boxplots.pdf", sampname), width=5, height=5)
-# 
-# for (pb in 1:length(pwboxlist)){
-#   pwbox = pwboxlist[[pb]]
-#   print(pwbox + labs(title=paste0(sampname, "\n", names(pwboxlist)[pb])))
-# }
-# 
-# dev.off()
-
 
 #~ HEATMAP #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-pdf(file=paste0(sampname, "_comparison_heatmap.pdf"), width = 350, height = 800)
+pdf(file=paste0(sampname, "_comparison_heatmap.pdf"), width = 4.5, height = 10)
 
 pheatmap(mat = samps_dat[,samps],
          color             = colorRampPalette( c("green", "black", "red"), space="rgb")(10),
-         cluster_cols = T,
+         cluster_cols      = T,
+         cluster_rows      = T,
          show_colnames     = TRUE,
          show_rownames     = TRUE,
-         fontsize          = 9,
-         main              = sampname)
+         fontsize          = 11,
+         main              = sampname,
+         labels_col = gsub("combining_", "", colnames(samps_dat[,samps])))
 
 
 dev.off()
@@ -625,8 +597,9 @@ dev.off()
 
 #~ SCATTER PAIRS 
 #colnames(plt_samps) = gsub("^.*1020_", "", colnames(plt_samps))
-pdf(file=paste0(sampname, "_RUV_scatter.png"), width = 8, height = 6)
-plt_scatter = pairs(samps_dat, lower.panel = scatter_line, upper.panel = panel.cor, pch = 19, main=paste0("Correlation of ", sampname))
+pdf(file=paste0(sampname, "_RUV_scatter.pdf"), width = 8, height = 6)
+
+pairs(samps_dat, lower.panel = scatter_line, upper.panel = panel.cor, main=paste0("Correlation of ", sampname))
 dev.off()
 
 print("done with comparison plots saving tables")
