@@ -7,7 +7,7 @@ suppressPackageStartupMessages(library(argparse))
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(reshape2))
 suppressPackageStartupMessages(library(gridExtra))
-suppressPackageStartupMessages(library(xlsx))
+suppressPackageStartupMessages(library(openxlsx))
 suppressPackageStartupMessages(library(jsonlite))
 
 ## ARGS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -20,12 +20,12 @@ parser$add_argument("--validation_file", type="character",
                     default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_rawdata_", matrix_version,".txt"),
                     dest="validation_file", help="validation file for controls comparison")
 parser$add_argument("--pos_file", type="character", 
-                    default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/knownpositives.txt"),
+                    default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/knownpositives_v1.0.txt"),
                     dest="pos_file", help="validation file known positive cellline and antibodies")
 parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box Sync/NANOSTRING/nanostring_metadata.xlsx",
                     dest="md_file", help="metadata file")
-parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE.csv",
-                    dest="ab_ref_file", help="ANTIBODY_REFERENCE.csv")
+parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE_v1.0.csv",
+                    dest="ab_ref_file", help="ANTIBODY_REFERENCE_v1.0.csv")
 parser$add_argument("--include_bad_Ab", action="store_true", default=FALSE,
                     dest="include_bad_Ab", help="include all antibodies")
 parser$add_argument("--version", action="version", version=paste0('%(prog)s = ', version))
@@ -63,8 +63,8 @@ ctrlregex = gsub("\\+", "\\\\+", paste0(paste0(controls, collapse = "|"),"|", "M
 pos = read.csv(pos_file, sep= "\t", row.names = 3, check.names = F)
 
 #metadata
-md = read.xlsx(file=md_file, sheetName = "nanostring_metadata", check.names=F)
-md$combined_name = paste0(md$Batch, "__", md$`Sample Name`)
+md = read.xlsx(xlsxFile=md_file, sheet="nanostring_metadata", check.names=T)
+md$combined_name = paste0(md$Batch, "__", md$Sample.Name)
 
 #rawdata
 new_batch = read.table(file = input_file, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
@@ -77,7 +77,7 @@ if (!any(make.names(controls) %in% colnames(new_batch))){
 ercc=new_batch[grepl("POS", rownames(new_batch)),]
 ercc_conc =  as.numeric(gsub("[^0-9.]", "",  rownames(ercc)))
 rsq = as.list(apply(ercc, 2, function(x) (cor(x, ercc_conc))^2))
-write_json(rsq, "ercc _rsquared.json",simplifyVector = FALSE, simplifyDataFrame = FALSE)
+write_json(rsq, "ercc _rsquared.json",simplifyVector = FALSE, simplifyDataFrame = FALSE, pretty=TRUE)
 
 if (include_bad_Ab){
   print("keeping all antibodies: IgG and antibodies that did not perform well or did not have dynamic range")
@@ -192,28 +192,32 @@ outdat$cellline = sapply(strsplit(as.character(rownames(outdat)), "__"), `[`, 1)
 outdat$probe = sapply(strsplit(as.character(rownames(outdat)), "__"), `[`, 2)
 
 baplot_ctl = ggplot(outdat) +
-  geom_point(aes(x=mean, y=new_batch-mean, color=cellline)) +
+  geom_point(aes(x=mean, y=new_batch-mean, color=antibody)) +
+  facet_wrap(~ cellline, scale="fixed") +
   geom_hline(yintercept=c(0, twosd, -twosd), color="red", linetype = 2) +
-  geom_text(data=data.frame(x=0,y=c(-twosd, twosd)), aes(x, y), label = c("2SD", "-2SD"), color="red") +
-  #geom_point(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,color=outdat$cellline)) +
-  #geom_text(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,label=rownames(outdat), hjust=-0.1), size=3) +
+  geom_text(data=data.frame(x=0,y=c(-twosd, twosd),l=c("2SD_diff", "-2SD_diff")), aes(x=x, y=y, label=l), color=c("red"), hjust=0, size=3) +
   labs(title = "Mean-Difference Plot of Celllines", x="Mean of validation batches", y="New Batch - Mean of validation batches") + 
-  theme(axis.text.x = element_text(size = 5), 
-        axis.text.y = element_text(size = 3),
-        strip.text = element_text(size=5))
+  theme(axis.text.x = element_text(size = 6), 
+        axis.text.y = element_text(size = 6),
+        strip.text = element_text(size=8))
 
 baplot_ab = ggplot(outdat) +
-  geom_point(aes(x=mean, y=new_batch-mean, color=probe)) +
+  geom_point(aes(x=mean, y=new_batch-mean, color=cellline)) +
+  facet_wrap(~ antibody, scale="fixed") +
   geom_hline(yintercept=c(0, twosd, -twosd), color="red", linetype = 2) +
-  geom_text(data=data.frame(x=0,y=c(-twosd, twosd)), aes(x, y), label = c("2SD", "-2SD"), color="red") +
+  geom_text(data=data.frame(x=0,y=c(-twosd, twosd),l=c("2SD_diff", "-2SD_diff")), aes(x=x, y=y, label=l), color=c("red"), hjust=0, size=2) +
   #geom_point(data = outdat, aes(x=mean,  y=outdat$new_batch-outdat$mean,color=outdat$probe)) +
   labs(title = "Mean-Difference Plot of Antibodies", x="Mean of validation batches", y="New Batch - Mean of validation batches") +
-  theme(legend.text=element_text(size=4),
-        axis.text.x = element_text(size = 5), 
-        axis.text.y = element_text(size =3))
+  theme(legend.position="right",
+        axis.text.x = element_text(size = 6), 
+        axis.text.y = element_text(size =6),
+        strip.text = element_text(size=8))
 
 
 print("saving QC plot")
 ggsave(filename ="QC_antibody_linear_plot.pdf", device = "pdf", plot=ggReg,width = 8, height = 8)
-ggsave(filename ="QC_antibody_meandiff_plot.pdf", device = "pdf", grid.arrange(baplot_ab, baplot_ctl),width = 7, height = 8)
+pdf(file="QC_antibody_meandiff_plot.pdf", width=11, height=7)
+print(baplot_ctl)
+print(baplot_ab)
+dev.off()
 
