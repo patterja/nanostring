@@ -579,7 +579,7 @@ dev.off()
 #colnames(plt_samps) = gsub("^.*1020_", "", colnames(plt_samps))
 pdf(file=paste0(sampname, "_RUV_scatter.pdf"), width = 8, height = 6)
 
-pairs(iris[,c(1,2)], lower.panel = function(x,y,...){points(x,y,...);abline(a = 0,b = 1,...)}, upper.panel = function(x, y) {usr <- par("usr"); on.exit(par(usr)); par(usr = c(0, 1, 0, 1)); r <- round(cor(x, y), digits=2); txt <- paste0("R = ", r); text(0.5, 0.5, txt)},main=paste0("Correlation of ", sampname))
+pairs(samps_dat, lower.panel = function(x,y,...){points(x,y,...);abline(a = 0,b = 1,...)}, upper.panel = function(x, y) {usr <- par("usr"); on.exit(par(usr)); par(usr = c(0, 1, 0, 1)); r <- round(cor(x, y), digits=2); txt <- paste0("R = ", r); text(0.5, 0.5, txt)},main=paste0("Correlation of ", sampname))
 
 print("done with comparison plots saving tables")
 
