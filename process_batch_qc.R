@@ -22,7 +22,7 @@ parser$add_argument("--validation_file", type="character",
 parser$add_argument("--pos_file", type="character", 
                     default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/knownpositives_v1.0.txt"),
                     dest="pos_file", help="validation file known positive cellline and antibodies")
-parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box Sync/NANOSTRING/nanostring_metadata.xlsx",
+parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box/NANOSTRING/nanostring_metadata.xlsx",
                     dest="md_file", help="metadata file")
 parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE_v1.0.csv",
                     dest="ab_ref_file", help="ANTIBODY_REFERENCE_v1.0.csv")

@@ -11,17 +11,21 @@ suppressPackageStartupMessages(library(openxlsx))
 suppressPackageStartupMessages(library(ruv))
 suppressPackageStartupMessages(library(nanoprot))
 suppressPackageStartupMessages(library(gridExtra))
-suppressPackageStartupMessages(library(RColorBrewer))
-
 
 version="4.0"
+mat_version = "20200512"
+ihc_version = "20200507"
 
 parser <- ArgumentParser()
 parser$add_argument("--data_dir", type="character", default="/Volumes/OHSU/CLINICAL/Nanostring/output", 
                     dest="data_dir", help="directory name")
 parser$add_argument("--comb_sheet", type="character", dest="comb_sheet", help="ruv samplesheet")
-parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box/NANOSTRING/nanostring_metadata.xlsx",
+parser$add_argument("--validation_file", type="character",default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_rawdata_", mat_version, ".txt"),
+                    dest="validation_file", help="validation file for controls comparison")
+parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box Sync/NANOSTRING/nanostring_metadata.xlsx",
                     dest="mbc_md_file", help="metastatic breast cancer metadata file")
+parser$add_argument("--ihc_file", type="character", default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ihc_status_", ihc_version, ".txt"),
+                    dest="ihc_file", help="ihc file")
 parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE_v1.0.csv",
                     dest="ab_ref_file", help="ANTIBODY_REFERENCE.csv")
 parser$add_argument("--include_ctrls", action="store_true", default=FALSE,
@@ -31,9 +35,11 @@ parser$add_argument("--version", action="version", version=paste0('%(prog)s = ',
 args <- parser$parse_args()
 data_dir = args$data_dir
 comb_sheet = args$comb_sheet
+validation_file = args$validation_file
 md_file = args$mbc_md_file
 ab_ref_file = args$ab_ref_file
 include_ctrls = args$include_ctrls
+ihc_file = args$ihc_file
 
 #Things to include and exclue
 controls=c("MCF7","HCC1954","BT474","HeyA8","MDA468.control","MDA468+EGF")
@@ -51,7 +57,7 @@ outdir = dirname(normalizePath(comb_sheet))
 # LOAD DATA ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #~ samplesheet
-print(paste0("output files will be in current dir: ", outdir))
+print(paste0("output files will be in current dir: ", getwd()))
 
 samps2batchcorr = read.table(file= comb_sheet, sep="\t", stringsAsFactors = F, header=T)
 sampname = gsub("_samplesheet.txt", "", basename(comb_sheet))
@@ -68,7 +74,21 @@ pathways = rbind(pathways, data.frame(ab_ref$X.AbID, Pathway=sapply(strsplit(as.
 
 pathways = pathways[complete.cases(pathways),]
 
+#~ validation
+validation = read.csv(validation_file, sep= "\t", row.names = 1, check.names = T)
 
+#ihc status 
+ihc = read.csv(ihc_file, sep= "\t", check.names = T)
+ihc$sampcolumn = make.names(paste0(ihc$Batch, "__", ihc$Sample.Name))
+
+#remove ihc duplicates and make cohorts samples ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+root_name = sapply(strsplit(as.character(ihc$Sample.Name), "\\s+"), `[`, 1)
+idx_dup = duplicated(root_name)
+ihc = ihc[!idx_dup,]
+
+cohs = list(BC_preTx = ihc$sampcolumn[ihc$cohort=="breast" & ihc$TNBC=="FALSE"], 
+            TNBC_preTx = ihc$sampcolumn[ihc$cohort=="breast" & ihc$TNBC=="TRUE"],
+            TNBC_onTx = ihc$sampcolumn[ihc$cohort=="breast_onTx" & ihc$TNBC=="TRUE"])
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ PARSE ALL SAMPLES FROM ALL BATCHES IN SAMPSHEET ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 raw_dats = c()
@@ -76,7 +96,7 @@ raw_samps = c()
 for (f in 1:length(unique(samps2batchcorr$Batch))){
   
   #get raw data
-  batch_name = unique(samps2batchcorr$Batch)[f]
+  batch_name = samps2batchcorr$Batch[f]
   file_name = as.character(paste0(data_dir,"/",batch_name ,"/rawdata.txt"))
   if (file.exists(file_name)){
     batch = read.table(file = file_name, sep="\t", row.names=2, stringsAsFactors=F, header=T, check.names = T)
@@ -89,16 +109,12 @@ for (f in 1:length(unique(samps2batchcorr$Batch))){
   ## TEST ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
   #TEST to see if sample names in batch directories
-  ss_samps=make.names(samps2batchcorr[which(samps2batchcorr$Batch==batch_name),"Sample.Name"])
-  for (samp in ss_samps){
-    if(samp %in% colnames(batch)){
-      print(paste0("Sample:", samp, " in ", file_name))
+  if(any(colnames(batch) %in% make.names(samps2batchcorr$Sample.Name))){
+    print(paste0("Sample:", samps2batchcorr$Sample.Name[f], " in ", file_name))
     } else {
-      print(paste0("Sample:", samp, " NOT in ", file_name, "\n Check sample name."))
-      stop()
+    print(paste0("Sample:", samps2batchcorr$Sample.Name[f], " NOT in ", file_name, "\n Check sample name."))
+    stop()
     }
-  }
-
   #TEST to make sure the controls are in each batch
   for (ctrl in make.names(controls)){
     if (!ctrl %in% colnames(batch)){
@@ -109,7 +125,7 @@ for (f in 1:length(unique(samps2batchcorr$Batch))){
   }
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
-  #get only samples you want to batch correct and the controls
+  #get only samples you want to batch and the controls
   idx_controls = which(make.names(colnames(batch)) %in% make.names(controls))
   idx_sample = which(make.names(colnames(batch)) %in% make.names(samps2batchcorr$Sample.Name))
   sel_batch = batch[,c(idx_controls, idx_sample)]
@@ -128,23 +144,28 @@ for (f in 1:length(unique(samps2batchcorr$Batch))){
     raw_samps = rbind(raw_samps, sel_md)
   }
 }
+colnames(raw_dats) = paste0("combining_", colnames(raw_dats))
+raw_samps$fullname = paste0("combining_", raw_samps$fullname)
 
 
-# COMBINING DATA ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# COMBINING DATA ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ## combine for replicate structure: rows combined with validation, ctrls and samples
-lcombined = log(raw_dats+1)
+combined_raw = cbind(validation, raw_dats[match(rownames(validation), rownames(raw_dats)),])
+lcombined = log(combined_raw+1)
 
-# COMBINED DATA METADATA ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# COMBINED DATA METADATA ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## create a new metadata for replicate structure
-combined_md = raw_samps
-combined_md$deid = ifelse(combined_md$sample %in% make.names(controls), yes=combined_md$sample, no="sample")
+combined_md = data.frame(batch = sapply(strsplit(as.character(colnames(lcombined)), "__"), `[`, 1), 
+                         samp =sapply(strsplit(as.character(colnames(lcombined)), "__"), `[`, 2),
+                         sampcolumn = c(colnames(lcombined)),stringsAsFactors = F)
+md = md[md$sampcolumn %in% combined_md$sampcolumn,]
+combined_md$deid = ifelse(combined_md$samp %in% make.names(controls), yes=combined_md$samp, no="sample")
 
 
 
 #~ RUV~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-combined_md$reps = ifelse(combined_md$sample %in% make.names(controls), yes=combined_md$sample, no=combined_md$fullname)
-
+combined_md$reps = ifelse(combined_md$samp %in% make.names(controls), yes=combined_md$samp, no=combined_md$sampcolumn)
 repmat = replicate.matrix(combined_md$reps)
 idx_ctl = grep(ab.ctrl, rownames(lcombined))
 
@@ -153,8 +174,10 @@ bcdat = t(RUVcorrected[,!grepl("POS|NEG", rownames(lcombined))])
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## because i got sick of calling it all the time
+celllines = combined_md$sampcolumn[combined_md$samp %in% make.names(controls)]
+valid_celllines = setdiff(celllines, raw_samps$fullname)
 samps = raw_samps$fullname[!raw_samps$sample %in% make.names(controls)]
-celllines = setdiff(raw_samps$fullname, samps)
+samp_celllines = setdiff(raw_samps$fullname, samps)
 
 
 #~ QC PLOTS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -164,7 +187,7 @@ dir.create("qc_figures", showWarnings = F)
 lctls=lcombined[!grepl("POS|NEG", rownames(lcombined)),celllines]
 
 limits_rle_raw = max(as.matrix(lctls))-median(as.matrix(lctls))
-rle_rawbox = ruv_rle(Y = t(lctls), rowinfo = as.matrix(combined_md[combined_md$fullname %in% celllines,]), 
+rle_rawbox = ruv_rle(Y = t(lctls), rowinfo = as.matrix(combined_md[combined_md$sampcolumn %in% celllines,]), 
                   ylim=c(-limits_rle_raw,limits_rle_raw)) +
   geom_point(aes(x = rle.x.factor, y = middle, colour = batch)) +
   geom_text(aes(x = rle.x.factor, y=-limits_rle_raw-0.5, label=colnames(lctls)), angle=90, hjust=0, size=2)+
@@ -178,7 +201,7 @@ ctl_bc = bcdat[,celllines]
 limits_rle_bc = max(as.matrix(ctl_bc))-median(as.matrix(ctl_bc))
 
 rle_ruvbox = ruv_rle(Y = t(ctl_bc), 
-                   rowinfo = as.matrix(combined_md[combined_md$fullname %in% celllines,]), 
+                   rowinfo = as.matrix(combined_md[combined_md$sampcolumn %in% celllines,]), 
                    ylim=c(-limits_rle_bc,limits_rle_bc)) +
   geom_point(aes(x = rle.x.factor, y = middle, colour = batch)) +
   geom_text(aes(x = rle.x.factor, y=-limits_rle_bc-0.5, label="RUVcorrected"), angle=90, hjust=0, size=2) +
@@ -193,7 +216,7 @@ rle_ruvbox = ruv_rle(Y = t(ctl_bc),
 # NORMAL HEATMAP
 pdf(paste0("qc_figures/",sampname,"_signal_heatmap.pdf"), width = 7, height = 8)
 ## rle raw
-rownames(combined_md) = combined_md$fullname
+rownames(combined_md) = combined_md$sampcolumn
 pheat_raw = pheatmap(mat = t(lctls),
                      color             = colorRampPalette(c("green", "black", "red"))(50),
                      border_color      = NA,
@@ -261,21 +284,21 @@ pheat_rleruv = pheatmap(mat = (rleruv),
                      filename = )
 dev.off()
 #~ PCA plots
-pcacol= combined_md$deid[match(colnames(lctls), combined_md$fullname)]
+pcacol= combined_md$deid[match(colnames(lctls), combined_md$sampcolumn)]
 pca_raw = pcaplot(mat = lctls, title = paste0("log2 (Normalized Signal + 1)\n", sampname, "_", "PRE-RUV"), col=pcacol)
 
-pcacol= combined_md$deid[match(colnames(ctl_bc), combined_md$fullname)]
+pcacol= combined_md$deid[match(colnames(ctl_bc), combined_md$sampcolumn)]
 pca_ruv = pcaplot(ctl_bc, title = paste0("RUV Processed\n", sampname, "_", "RUVcorrected"), pcacol)
 
 #~ TRA 
 #t(RUVcorrected) is post norm, comb is pre norm, using no antibody filtered data
 eruv = t(exp(ctl_bc))
-rawctls = t(raw_dats)[rownames(eruv),colnames(eruv)]
+rawctls = t(combined_raw)[rownames(eruv),colnames(eruv)]
 tra = matrix(NA, nrow = 0, ncol = 4)
 
 for (ctrl in make.names(controls)){
   #get matrix of celllines for controls not including batches of interest
-  valid.ctrl_names = combined_md$fullname[combined_md$samp == ctrl]
+  valid.ctrl_names = combined_md$sampcolumn[combined_md$samp == ctrl]
 
   selv.ctrl_raw = rawctls[valid.ctrl_names,, drop=F]
   selv.ctrl_ruv = eruv[valid.ctrl_names,, drop=F]
@@ -291,12 +314,12 @@ for (ctrl in make.names(controls)){
 
 tra_btwn_batch = matrix(NA, nrow = 0, ncol = 4)
 
-allselraw = t(raw_dats[!grepl("POS|NEG", rownames(lcombined)),celllines])
-allselruv = t(exp(bcdat[,celllines]))
+allselraw = t(combined_raw[!grepl("POS|NEG", rownames(lcombined)),samp_celllines])
+allselruv = t(exp(bcdat[,samp_celllines]))
 
 for (ctrl in make.names(controls)){
   #get matrix of celllines for controls not including batches of interest
-  valid.ctrl_names = celllines[grep(ctrl, celllines)]
+  valid.ctrl_names = samp_celllines[grep(ctrl, samp_celllines)]
   if (length(valid.ctrl_names)==1){
     selv.ctrl_raw = rbind(allselraw[valid.ctrl_names,, drop=F],allselraw[valid.ctrl_names,, drop=F])
     selv.ctrl_ruv = rbind(allselruv[valid.ctrl_names,, drop=F],allselruv[valid.ctrl_names,, drop=F])
@@ -364,27 +387,58 @@ if (include_ctrls){
 }
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ SPLITTING AND MELTING~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-samps_dat = fbcdat[,!colnames(fbcdat) %in% celllines,drop=F]
+validsamp_dat = fbcdat[,!colnames(fbcdat) %in% valid_celllines & !grepl("combining", colnames(fbcdat)),drop=F]
+samps_dat = fbcdat[,!colnames(fbcdat) %in% celllines & grepl("combining", colnames(fbcdat)),drop=F]
 
+validsamp.datm = melt(validsamp_dat,  id.vars=row.names)
 samps.datm = data.frame(melt(samps_dat, id.vars=row.names))
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+comb_cohorts = c()
+samp_cohorts = c()
+for (c in seq(1:length(cohs))){
+  temp_coh = validsamp.datm[validsamp.datm$Var2 %in% make.names(cohs[[c]]),]
+  print(length(table(as.character(temp_coh$Var2))))
+  temp_coh$ab = names(cohs[c])
+  comb_cohorts = rbind(comb_cohorts, temp_coh)
+  
+}
+comb_cohorts$ab_Var1 = paste0(comb_cohorts$ab, "_", comb_cohorts$Var1)
+samp_cohorts = samps.datm
+
+
+# Get percentiles~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+coh_percs = list()
+for (cidx in seq(1:length(unique(comb_cohorts$ab)))){
+  temp = c()
+  selcoh = comb_cohorts[comb_cohorts$ab==names(cohs)[cidx],]
+  
+  for (ab in unique(comb_cohorts$Var1)){
+    selab= selcoh[selcoh$Var1==ab , "value"]
+    temp = rbind(temp, ab=quantile(selab, c(0.05, 0.15, 0.25, 0.75, 0.85, 0.95)))
+    rownames(temp)[which(rownames(temp)=="ab")]=ab
+    
+  }
+  coh_percs = append(coh_percs, list(temp))
+  names(coh_percs)[cidx] = names(cohs)[cidx]
+}
 
 # ANTIBODY THRESHOLDING setting with detectable flag ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ## if signal for antibody below sample igg then turned to minimum of validation  cohort
 ## if signal above do nothing
-samps.datm['detectable']=TRUE
+samp_cohorts['detectable']=TRUE
 for (samp in samps){
-  newsamp = raw_dats[,samp, drop=F]
+  newsamp = combined_raw[,samp, drop=F]
   #newsamp = lcombined[,samp, drop=F]
   rbigg = newsamp[which(rownames(newsamp)=="RbAb-IgG"),]
   mmigg = newsamp[which(rownames(newsamp)=="MmAb-IgG1"),]
   for (i in seq(1:length(ab_order))){
     ab = (ab_order)[i]
-    idx = which(samps.datm$Var1==ab & samps.datm$Var2==samp)
-
+    idx = which(samp_cohorts$Var1==ab & samp_cohorts$Var2==samp)
+    minval = min(as.numeric(comb_cohorts[comb_cohorts$Var1==ab, "value"]), na.rm=T)-1
+    
     if (ab_ref$Host[which(ab_ref$X.AbID==ab)]=="rabbit"){
       val = newsamp[ab,]-rbigg
     } else if (ab_ref$Host[which(ab_ref$X.AbID==ab)]=="mouse"){
@@ -395,130 +449,142 @@ for (samp in samps){
     }
     if (val < 0){
       #get index of samples with ab and samp
-      samps.datm[idx,"detectable"] = FALSE
-      samps.datm[idx,"newvalue"] = NA
+      samp_cohorts[idx,"detectable"] = FALSE
+      samp_cohorts[idx,"newvalue"] = minval
     } else{
-      samps.datm[idx,"newvalue"] = samps.datm[idx,"value"]
+      samp_cohorts[idx,"newvalue"] = samp_cohorts[idx,"value"]
+    }
+  }
+}
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+##multiple sample thresholding  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+thresh=data.frame("5_95"=c("5%", "95%"), "15_85"=c("15%", "85%"), "25_75"=c("25%","75%"), stringsAsFactors = F)
+cohorder = c()
+for (cidx in seq(1:length(coh_percs))){
+  coh = names(coh_percs)[cidx]
+  print(coh)
+  for (ab in unique(comb_cohorts$Var1)){
+    #print(ab)
+    cohtemp = coh_percs[[coh]][ab,]
+    for (tidx in seq(1:ncol(thresh))){
+      lowthresh = cohtemp[thresh[1,tidx]]
+      highthresh = cohtemp[thresh[2,tidx]]
+      classname = paste0(names(coh_percs)[cidx], "__", colnames(thresh)[tidx])
+      for (samp in samps){
+        idxab = which(samp_cohorts$Var1==ab & samp_cohorts$Var2==samp)
+        samp_cohorts[idxab,classname] = ifelse(samp_cohorts[idxab,"detectable", drop=T]==FALSE, yes = "ND",
+                                               no = ifelse(samp_cohorts[idxab,"value",drop=T] <= lowthresh, yes="low",
+                                                           no = ifelse(samp_cohorts[idxab,"value",drop=T] >= highthresh, yes="high", no="indeterminate")))
+        
+        if(!classname %in% cohorder) {cohorder = c(cohorder, classname)}
+      }
     }
   }
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~ BINMAPS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ab_order = intersect(ab_ref$X.AbID[order(ab_ref$Target)], samp_cohorts$Var1)
+
+msamp = melt(samp_cohorts, id.vars = list("Var1", "Var2"), measure.vars = which(colnames(samp_cohorts) %in% cohorder))
+msamp$sampnames = paste0(make.names(sapply(strsplit(as.character(msamp$Var2), "__"), `[`, 2)))
+msamp$cohortnames = paste0(make.names(sapply(strsplit(as.character(msamp$variable), "__"), `[`, 1)))
+msamp$names = paste0(msamp$cohortnames,"__", msamp$sampnames)
+
+
+samphmlist <- list()
+for (samp in samps){
+  for (thresholds in colnames(thresh)){
+    mmsamp = msamp[grepl(thresholds, msamp$variable) & msamp$Var2==samp,]
+    mmsamp$Var1 = factor(mmsamp$Var1, levels=ab_order)
+    #mmsamp$discrete_ab = as.numeric(factor(mmsamp$Var1))
+    mmsamp$cohortnames = factor(mmsamp$cohortnames, levels = unique(mmsamp$cohortnames))
+    hm= ggplot(mmsamp) +
+      geom_tile(aes(x=cohortnames, y=Var1, fill=factor(value)),colour = "grey50") +
+      scale_fill_manual(values=c("indeterminate"="white", "ND"="black","low"="yellow","high"="blue")) +
+      scale_x_discrete(name ="Cohort", breaks = mmsamp$cohortnames, labels = mmsamp$names) +
+      #scale_y_continuous(breaks=mmsamp$discrete_ab, label=mmsamp$Var1, sec.axis = sec_axis(~.,breaks = mmsamp$discrete_ab,labels = round(mmsamp$rat, 1), name=paste0("Ratio of Biopsies: ", rationame)))+
+      labs(x="Cohort", title=paste0("Threshold on ", thresh[1,thresholds], " and ", thresh[2,thresholds],"\n",  unique(mmsamp$sampnames)), y="Antibody") +
+      theme(axis.text.x = element_text(size=6, colour=c("black"), angle = 90, hjust=1, vjust=0.5),
+            axis.text.y = element_text(size=6),
+            axis.title.x = element_text(size=6),
+            axis.title.y = element_text(size=6),
+            panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                            colour = "gray60"),
+            panel.background = element_blank(),
+            plot.title = element_text(hjust = 0.5, size=9),
+            legend.title = element_blank()) 
+    
+    samphmlist[[samp]][[thresholds]] = hm
+  }
+}
+pdf(file=sprintf("%s_heatmaps.pdf", sampname), width=10, height=6)
+for (samp in samps){
+  grid.arrange(samphmlist[[samp]][["X5_95"]], samphmlist[[samp]][["X15_85"]], samphmlist[[samp]][["X25_75"]], ncol=3, top=samp)
+}
+
+dev.off()
+
 #~ ORDERING ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-samp_box = samps.datm
-samp_box$Var1 = factor(samp_box$Var1, levels=ab_order)
+comb_cohorts_box = comb_cohorts
+samp_cohorts_box = c()
+for (coh in unique(comb_cohorts$ab)){
+  samp_cohorts_box = rbind(samp_cohorts_box, data.frame(samp_cohorts, "ab"=coh))}
+comb_cohorts_box$Var1 = factor(comb_cohorts$Var1, levels=ab_order)
+samp_cohorts_box$Var1 = factor(samp_cohorts_box$Var1, levels=ab_order)
 
 #~ BOXPLOTS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+palette = c("#FF0000FF","#004CFFFF","#00A600FF","#984ea3","#ff7f00","#a65628")
+bp = ggplot(comb_cohorts_box, aes(x=ab, y=value)) + 
+  geom_boxplot() +
+  geom_point(data=samp_cohorts_box[samp_cohorts_box$detectable==TRUE,], mapping=aes(x=ab, y=newvalue, colour=Var2), shape=8, size=2) +
+  geom_text(data=samp_cohorts_box[samp_cohorts_box$detectable==FALSE,], mapping=aes(x=ab, y=newvalue, colour=Var2), label="ND", size=3, position=position_jitter(width=c(0.03))) +
+  facet_wrap(~Var1, scale="free") +
+  labs(x="cohort", y="log batch corrected counts", title=sampname) +
+  scale_color_manual(values=palette[1:length(samps)]) +
+  theme(panel.background = element_rect(fill = "white"),
+        panel.grid.major=element_line(colour="gray90"),
+        plot.title = element_text(hjust = 0.5, vjust=0),
+        legend.title = element_blank(),
+        legend.text=element_text(size=9),
+        legend.position="bottom",
+        axis.text.x = element_text(size=6, colour=c("black")),
+        axis.text.y = element_text(size=9, colour="black"))
+
+
+pdf(file=sprintf("%s_boxplots.pdf", sampname), width=10, height=9)
+print(bp)
+dev.off()
 
 
 #~ HEATMAP #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+pdf(file=paste0(sampname, "_comparison_heatmap.pdf"), width = 4.5, height = 10)
 
-samps.datc = acast(samps.datm, Var1 ~ Var2, value.var = "newvalue")
-samps.datc = samps.datc[ab_order,sort(colnames(samps.datc))]
-samps.datraw = lcombined[!grepl("POS|NEG", rownames(lcombined)),!colnames(lcombined) %in% celllines,drop=F]
-samps.datraw = samps.datraw[ab_order,sort(colnames(samps.datraw))]
-pdf(file=paste0(sampname, "_comparison_heatmap.pdf"), width = 7, height = 11)
-
-pheatmap(mat = samps.datraw,
-         color             = colorRampPalette( c("green", "black", "red"), space="rgb")(10),
-         cluster_cols      = F,
-         cluster_rows      = F,
-         show_colnames     = TRUE,
-         show_rownames     = TRUE,
-         fontsize          = 11,
-         na_col            = c("white"),
-         border_color      = c("black"),
-         main              = sprintf("log raw: %s", sampname))
-
-
-pheatmap(mat = samps.datc,
-         color             = colorRampPalette( c("green", "black", "red"), space="rgb")(10),
-         cluster_cols      = F,
-         cluster_rows      = F,
-         show_colnames     = TRUE,
-         show_rownames     = TRUE,
-         fontsize          = 11,
-         na_col            = c("white"),
-         border_color      = c("black"),
-         main              = sprintf("RUV corrected: %s", sampname))
-
-samps.datc.na = samps.datc
-samps.datc.na[is.na(samps.datc.na)] =-1
-pheatmap(mat = samps.datc.na,
-         color             = colorRampPalette( c("green", "black", "red"), space="rgb")(10),
-         cluster_cols      = F,
-         cluster_rows      = T,
-         show_colnames     = TRUE,
-         show_rownames     = TRUE,
-         fontsize          = 11,
-         na_col            = c("white"),
-         border_color      = c("black"),
-         main              = sprintf("RUV corrected: %s \n Clustered Antibodies", sampname))
-
-pheatmap(mat = samps.datc.na,
+pheatmap(mat = samps_dat[,samps],
          color             = colorRampPalette( c("green", "black", "red"), space="rgb")(10),
          cluster_cols      = T,
          cluster_rows      = T,
          show_colnames     = TRUE,
          show_rownames     = TRUE,
          fontsize          = 11,
-         na_col            = c("white"),
-         border_color      = c("black"),
-         main              = sprintf("RUV corrected: %s \n Clustered Antibodies and Clustered Samples", sampname))
+         main              = sampname,
+         labels_col = gsub("combining_", "", colnames(samps_dat[,samps])))
+
 
 dev.off()
 
-pdf(file=paste0(sampname, "_comparison_heatmap2.pdf"), width = 7, height = 11)
 
-pheatmap(mat = samps.datraw,
-         color             = c(colorRampPalette(brewer.pal(9,"YlOrRd"))(9),"#67001f"),
-         cluster_cols      = F,
-         cluster_rows      = F,
-         show_colnames     = TRUE,
-         show_rownames     = TRUE,
-         fontsize          = 11,
-         na_col            = c("white"),
-         border_color      = c("black"),
-         main              = sprintf("log raw: %s", sampname))
+#~ SCATTER PAIRS 
+#colnames(plt_samps) = gsub("^.*1020_", "", colnames(plt_samps))
+pdf(file=paste0(sampname, "_RUV_scatter.pdf"), width = 8, height = 6)
 
-pheatmap(mat = samps.datc,
-         color             = c(colorRampPalette(brewer.pal(9,"YlOrRd"))(9),"#67001f"),
-         cluster_cols      = F,
-         cluster_rows      = F,
-         show_colnames     = TRUE,
-         show_rownames     = TRUE,
-         fontsize          = 11,
-         na_col            = c("white"),
-         border_color      = c("black"),
-         main              = sprintf("RUV corrected: %s", sampname))
+pairs(samps_dat, lower.panel = function(x,y,...){points(x,y,...);abline(a = 0,b = 1,...)}, upper.panel = function(x, y) {usr <- par("usr"); on.exit(par(usr)); par(usr = c(0, 1, 0, 1)); r <- round(cor(x, y), digits=2); txt <- paste0("R = ", r); text(0.5, 0.5, txt)},main=paste0("Correlation of ", sampname))
 
-samps.datc.na = samps.datc
-samps.datc.na[is.na(samps.datc.na)] =-1
-pheatmap(mat = samps.datc.na,
-         color             = c("#FFFFFF", colorRampPalette(brewer.pal(9,"YlOrRd"))(9),"#67001f"),
-         cluster_cols      = F,
-         cluster_rows      = T,
-         show_colnames     = TRUE,
-         show_rownames     = TRUE,
-         fontsize          = 11,
-         na_col            = c("white"),
-         border_color      = c("black"),
-         main              = sprintf("RUV corrected: %s \n Clustered Antibodies", sampname))
-
-pheatmap(mat = samps.datc.na,
-         color             = c("#FFFFFF", colorRampPalette(brewer.pal(9,"YlOrRd"))(9),"#67001f"),
-         cluster_cols      = T,
-         cluster_rows      = T,
-         show_colnames     = TRUE,
-         show_rownames     = TRUE,
-         fontsize          = 11,
-         na_col            = c("white"),
-         border_color      = c("black"),
-         main              = sprintf("RUV corrected: %s \n Clustered Antibodies and Clustered Samples", sampname))
-
-dev.off()
+print("done with comparison plots saving tables")
 
 #~ TABLES #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 write.table(x = t(bcdat), file=paste0(sampname, "_RUVcorrected.csv"),sep=",", quote = F, row.names = T, col.names = NA)
-write.table(x = t(raw_dats), file=paste0(sampname, "_raw.csv"), sep=",", quote = F, row.names = T, col.names = NA)
+write.table(x = t(combined_raw), file=paste0(sampname, "_raw.csv"), sep=",", quote = F, row.names = T, col.names = NA)
 

@@ -30,7 +30,7 @@ known_pos_file="${DATA_DIR}""/""REFERENCE_FILES/knownpositives_v"${knownpos_vers
 #validation2geo_file="${DATA_DIR}""/""REFERENCE_FILES/validation_samples_geosamp_normalized_"${valid_version}".txt"
 validationraw_file="${DATA_DIR}""/""REFERENCE_FILES/validation_samples_rawdata_"${valid_version}".txt"
 ihc_file="${DATA_DIR}""/""REFERENCE_FILES/ihc_status_"${ihc_version}".txt"
-md_file="/Users/patterja/Box Sync/NANOSTRING/nanostring_metadata.xlsx"
+md_file="/Users/patterja/Box/NANOSTRING/nanostring_metadata.xlsx"
 #find samplesheet
 echo $NEWBATCH
 echo "${FILES[@]}"
@@ -43,7 +43,7 @@ if test -f "$ss"; then
     echo "dir made"
     cd "${output_dir}" 
     echo `pwd`
-    python3 "${REPO_DIR}""/"process_rcc.py --samplesheet "$ss" --abfile "${abfile}" ${FILES[@]}
+    /usr/local/bin/python3 "${REPO_DIR}""/"process_rcc.py --samplesheet "$ss" --abfile "${abfile}" ${FILES[@]}
 else
     echo "no samplesheet"
     exit 1
@@ -51,7 +51,7 @@ fi
 
 #Step 2: if rawdata.txt exists run per batch scaling 
 if [ -s rawdata.txt ]; then
-    python3 "${REPO_DIR}""/"norm_nanostring.py --rawdata "rawdata.txt" --abfile "${abfile}"
+    /usr/local/bin/python3 "${REPO_DIR}""/"norm_nanostring.py --rawdata "rawdata.txt" --abfile "${abfile}"
 else
     echo "something went wrong with processing rawdata.txt"
     exit 1
