@@ -1,11 +1,24 @@
 ## Analysis of Nanostring nCounter Vantage Protein Assays
-
-Knight Diagnoistics Laboratory
+nCounter Digital Analyzer 5s
+GeneRLF: NS_FFPE_STPath_Protein_v1.0
+SystemAPF: 'n6_vDV1'
+Output RCC FileVersion: 1.7
+Nanostring SoftwareVersion: 4.0.1.8
 
 Pipeline is currently run locally
  - Platform: x86_64-apple-darwin 15.6.0 (64-bit)
  - R version 3.5.2 (2018-12-20)
  - Python version Python 3.7.7
+
+### Input files
+![Batch Processing Workflow](/images/Canvas 1.png)
+![Combining Batches/Samples Workflow](/images/Canvas 2.png)
+```
+The <batch_id> is an identifier provided by the technician. It is pre-pended to
+the samplesheet which is sent to the analyst for processing.
+
+`<batch_id>_samplesheet.txt`
+
 
 Bash pipeline script using `run_processing_scripts.sh` which can be run like this:
 ```
@@ -17,7 +30,6 @@ run_processing_scripts.sh 20190314_208421591020
 Current R processing scripts have dependency of custom nanoprot package. 
 [nanoprot](https://github.com/patterja/nanoprot)
 
-This is a minimal package at the moment which contains only a three functions for plotting PCA and calculating RLE. However there to extend this and simplify some of these processing scripts by transferring all the plotting functions here. 
 
 Scripts are dependent on multiple files:
 
