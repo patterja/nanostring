@@ -23,7 +23,7 @@ parser$add_argument("--input", help="rawdata.txt", dest="input_file")
 parser$add_argument("--validation_file", type="character", 
                     default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_rawdata_", mat_version, ".txt"),
                     dest="validation_file", help="validation file for controls comparison")
-parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box Sync/NANOSTRING/nanostring_metadata.xlsx",
+parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box/NANOSTRING/nanostring_metadata.xlsx",
                     dest="md_file", help="metadata file")
 parser$add_argument("--ihc_file", type="character", default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ihc_status_", ihc_version, ".txt"),
                     dest="ihc_file", help="ihc file")
@@ -167,7 +167,7 @@ for (samp in setdiff(colnames(new_batch), controls)) {
   
   
   # signal HEATMAP
-  pdf(paste0("ruv_figures/",samp,"_signal_heatmap.pdf"), width = 7, height = 8)
+  pdf(paste0("ruv_figures/",samp,"_control_heatmap.pdf"), width = 7, height = 8)
   rownames(comb_md) = comb_md$sampcolumn
   pheat_raw = pheatmap(mat = t(lctls),
     color             = colorRampPalette(c("green", "black", "red"))(50),
@@ -272,7 +272,7 @@ for (samp in setdiff(colnames(new_batch), controls)) {
     theme(legend.position = "bottom")
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   print("saving batch correction plots")
-  png(file=paste0("ruv_figures/",samp,"_", ctrl, "_TRA.pdf"), width = 800, height = 800)
+  png(file=paste0("ruv_figures/",samp,"_TRA.pdf"), width = 800, height = 800)
   plot(ptra)
   dev.off()
   
@@ -401,7 +401,7 @@ for (samp in setdiff(colnames(new_batch), controls)) {
     msamp$cohortnames = paste0(make.names(sapply(strsplit(as.character(msamp$variable), "__"), `[`, 1)))
     msamp$names = paste0(msamp$cohortnames,"__", msamp$sampnames)
     
-    #~ heatmap 
+    #~ binmap
     hmlist <- list()
     for (thresholds in colnames(thresh)){
       mmsamp = msamp[grepl(thresholds, msamp$variable),]

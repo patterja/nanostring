@@ -22,7 +22,7 @@ parser$add_argument("--data_dir", type="character", default="/Volumes/OHSU/CLINI
 parser$add_argument("--comb_sheet", type="character", dest="comb_sheet", help="ruv samplesheet")
 parser$add_argument("--validation_file", type="character",default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_rawdata_", mat_version, ".txt"),
                     dest="validation_file", help="validation file for controls comparison")
-parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box Sync/NANOSTRING/nanostring_metadata.xlsx",
+parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box/NANOSTRING/nanostring_metadata.xlsx",
                     dest="mbc_md_file", help="metastatic breast cancer metadata file")
 parser$add_argument("--ihc_file", type="character", default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ihc_status_", ihc_version, ".txt"),
                     dest="ihc_file", help="ihc file")
@@ -181,7 +181,7 @@ samp_celllines = setdiff(raw_samps$fullname, samps)
 
 
 #~ QC PLOTS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-dir.create("qc_figures", showWarnings = F)
+dir.create("ruv_figures", showWarnings = F)
 
 #~ RLE box plot
 lctls=lcombined[!grepl("POS|NEG", rownames(lcombined)),celllines]
@@ -214,7 +214,7 @@ rle_ruvbox = ruv_rle(Y = t(ctl_bc),
 
 
 # NORMAL HEATMAP
-pdf(paste0("qc_figures/",sampname,"_signal_heatmap.pdf"), width = 7, height = 8)
+pdf(paste0("ruv_figures/",sampname,"_control_heatmap.pdf"), width = 7, height = 8)
 ## rle raw
 rownames(combined_md) = combined_md$sampcolumn
 pheat_raw = pheatmap(mat = t(lctls),
@@ -248,7 +248,7 @@ pheat_ruv = pheatmap(mat = t(ctl_bc),
 dev.off()
 # RLE HEATMAP
 ## rle raw
-pdf(paste0("qc_figures/",sampname,"_RLE_heatmap.pdf"), width = 7, height = 8)
+pdf(paste0("ruv_figures/",sampname,"_RLE_heatmap.pdf"), width = 7, height = 8)
 rleraw = rel_log_exp(t(lctls))
 pheat_rleraw = pheatmap(
   mat = rleraw,
@@ -356,17 +356,17 @@ ptra_btwn=ggplot(tra_btwn_batch, aes(x=sample, y=value, fill=sample)) +
 
 
 print("saving batch correction plots")
-pdf(file=paste0("qc_figures/",sampname,"_TRA.pdf"), width = 8, height = 8)
+pdf(file=paste0("ruv_figures/",sampname,"_TRA.pdf"), width = 8, height = 8)
 print(ptra)
 print(ptra_btwn)
 dev.off()
 
-pdf(paste0("qc_figures/",sampname,"_RLE_boxplots.pdf"), width = 8, height = 4)
+pdf(paste0("ruv_figures/",sampname,"_RLE_boxplots.pdf"), width = 8, height = 4)
 print(rle_rawbox)
 print(rle_ruvbox)
 dev.off()
 
-pdf(paste0("qc_figures/",sampname,"_PCA.pdf"), width = 8, height = 8)
+pdf(paste0("ruv_figures/",sampname,"_PCA.pdf"), width = 8, height = 8)
 print(pca_raw)
 print(pca_ruv)
 dev.off()
@@ -519,7 +519,7 @@ for (samp in samps){
     samphmlist[[samp]][[thresholds]] = hm
   }
 }
-pdf(file=sprintf("%s_heatmaps.pdf", sampname), width=10, height=6)
+pdf(file=sprintf("%s_binmaps.pdf", sampname), width=10, height=6)
 for (samp in samps){
   grid.arrange(samphmlist[[samp]][["X5_95"]], samphmlist[[samp]][["X15_85"]], samphmlist[[samp]][["X25_75"]], ncol=3, top=samp)
 }
@@ -538,7 +538,7 @@ samp_cohorts_box$Var1 = factor(samp_cohorts_box$Var1, levels=ab_order)
 palette = c("#FF0000FF","#004CFFFF","#00A600FF","#984ea3","#ff7f00","#a65628")
 bp = ggplot(comb_cohorts_box, aes(x=ab, y=value)) + 
   geom_boxplot() +
-  geom_point(data=samp_cohorts_box[samp_cohorts_box$detectable==TRUE,], mapping=aes(x=ab, y=newvalue, colour=Var2), shape=8, size=2) +
+  geom_point(data=samp_cohorts_box[samp_cohorts_box$detectable==TRUE,], mapping=aes(x=ab, y=newvalue, colour=Var2), shape=8, size=2, show.legend =TRUE) +
   geom_text(data=samp_cohorts_box[samp_cohorts_box$detectable==FALSE,], mapping=aes(x=ab, y=newvalue, colour=Var2), label="ND", size=3, position=position_jitter(width=c(0.03))) +
   facet_wrap(~Var1, scale="free") +
   labs(x="cohort", y="log batch corrected counts", title=sampname) +
@@ -550,16 +550,18 @@ bp = ggplot(comb_cohorts_box, aes(x=ab, y=value)) +
         legend.text=element_text(size=9),
         legend.position="bottom",
         axis.text.x = element_text(size=6, colour=c("black")),
-        axis.text.y = element_text(size=9, colour="black"))
+        axis.text.y = element_text(size=9, colour="black")) +
+  guides(colour=guide_legend(ncol=1))
+  
 
-
-pdf(file=sprintf("%s_boxplots.pdf", sampname), width=10, height=9)
+print("boxplot plotted")
+pdf(file=sprintf("%s_boxplots.pdf", sampname), width=10, height=9.5)
 print(bp)
 dev.off()
 
 
 #~ HEATMAP #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-pdf(file=paste0(sampname, "_comparison_heatmap.pdf"), width = 4.5, height = 10)
+pdf(file=paste0(sampname, "_samples_heatmap.pdf"), width = 4.5, height = 10)
 
 pheatmap(mat = samps_dat[,samps],
          color             = colorRampPalette( c("green", "black", "red"), space="rgb")(10),
@@ -577,7 +579,8 @@ dev.off()
 
 #~ SCATTER PAIRS 
 #colnames(plt_samps) = gsub("^.*1020_", "", colnames(plt_samps))
-pdf(file=paste0(sampname, "_RUV_scatter.pdf"), width = 8, height = 6)
+
+pdf(file=paste0(sampname, "_sample_correlation.pdf"), width = 8, height = 6)
 
 pairs(samps_dat, lower.panel = function(x,y,...){points(x,y,...);abline(a = 0,b = 1,...)}, upper.panel = function(x, y) {usr <- par("usr"); on.exit(par(usr)); par(usr = c(0, 1, 0, 1)); r <- round(cor(x, y), digits=2); txt <- paste0("R = ", r); text(0.5, 0.5, txt)},main=paste0("Correlation of ", sampname))
 
@@ -585,6 +588,6 @@ print("done with comparison plots saving tables")
 
 #~ TABLES #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-write.table(x = t(bcdat), file=paste0(sampname, "_RUVcorrected.csv"),sep=",", quote = F, row.names = T, col.names = NA)
-write.table(x = t(combined_raw), file=paste0(sampname, "_raw.csv"), sep=",", quote = F, row.names = T, col.names = NA)
+write.table(x = t(bcdat), file=file.path("ruv_figures", paste0(sampname, "_RUVcorrected.txt")),sep="\t", quote = F, row.names = T, col.names = NA)
+write.table(x = t(combined_raw), file=file.path("ruv_figures", paste0(sampname, "_raw.txt")), sep="\t", quote = F, row.names = T, col.names = NA)
 
