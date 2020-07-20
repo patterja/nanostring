@@ -24,8 +24,6 @@ parser$add_argument("--pos_file", type="character",
                     dest="pos_file", help="validation file known positive cellline and antibodies")
 parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box/NANOSTRING/nanostring_metadata.xlsx",
                     dest="md_file", help="metadata file")
-parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE_v1.0.csv",
-                    dest="ab_ref_file", help="ANTIBODY_REFERENCE_v1.0.csv")
 parser$add_argument("--include_bad_Ab", action="store_true", default=FALSE,
                     dest="include_bad_Ab", help="include all antibodies")
 parser$add_argument("--version", action="version", version=paste0('%(prog)s = ', version))
@@ -36,7 +34,6 @@ input_file = args$input_file
 validation_file = args$validation_file
 pos_file = args$pos_file
 md_file = args$md_file
-ab_ref_file = args$ab_ref_file
 include_bad_Ab = args$include_bad_Ab
 
 
@@ -73,28 +70,19 @@ if (!any(make.names(controls) %in% colnames(new_batch))){
   stop("no controls in this batch")
 }
 
-## ERCC POS DATA ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-ercc=new_batch[grepl("POS", rownames(new_batch)),]
-ercc_conc =  as.numeric(gsub("[^0-9.]", "",  rownames(ercc)))
-rsq = as.list(apply(ercc, 2, function(x) (cor(x, ercc_conc))^2))
-write_json(rsq, "ercc _rsquared.json",simplifyVector = FALSE, simplifyDataFrame = FALSE, pretty=TRUE)
+## log and include_bad_ab flag ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 if (include_bad_Ab){
   print("keeping all antibodies: IgG and antibodies that did not perform well or did not have dynamic range")
   # validation file
   validation = read.csv(validation_file, sep= "\t", row.names = 1, check.names = F)
   validation=log2(validation+1)
-
-  # AB FILE
-  ab_ref = read.csv(ab_ref_file, sep=",", stringsAsFactors=F)
   
   # NEW BATCH
   
   lnew_batch = log2(new_batch+1)
-  
-  #AB_ORDER
-  ab_order = ab_ref$X.AbID[order(ab_ref$Target)]
-  
+
 } else {
   omit = c("p-TSC2", "TSC2", "NEG","POS")
   omitregex = paste0(paste0("^", omit), collapse = "|")
@@ -104,17 +92,9 @@ if (include_bad_Ab){
   validation = validation[!grepl(omitregex, rownames(validation)),]
   lvalidation=log2(validation+1)
  
-  #AB FILE
-  ab_ref = read.csv(ab_ref_file, sep=",", stringsAsFactors=F)
-  ab_ref = ab_ref[!grepl(omitregex, ab_ref$X.AbID),]
-  
   #NEW BATCH
   new_batch = new_batch[!grepl(omitregex, rownames(new_batch)),]
   lnew_batch = log2(new_batch+1)
-
-  #AB_ORDER
-  ab_order = ab_ref$X.AbID[order(ab_ref$Target)]
-  ab_order = ab_order[!grepl(omitregex, ab_order)]
 }
 
 
@@ -136,9 +116,9 @@ validation_stats = data.frame(
   "stddev" = tapply(lctl_norm.m$value, lctl_norm.m$ctl_probe, sd),
   "coeff_var" = tapply(lctl_norm.m$value, lctl_norm.m$ctl_probe, sd)/tapply(lctl_norm.m$value, lctl_norm.m$ctl_probe, mean),
   "mean.minus.2sd" =tapply(lctl_norm.m$value, lctl_norm.m$ctl_probe, mean) - 
-    2*(tapply(lctl_norm.m$value, lctl_norm.m$ctl_probe, sd)),
+    3*(tapply(lctl_norm.m$value, lctl_norm.m$ctl_probe, sd)),
   "mean.plus.2sd" = tapply(lctl_norm.m$value, lctl_norm.m$ctl_probe, mean) + 
-    2*(tapply(lctl_norm.m$value, lctl_norm.m$ctl_probe, sd)))
+    3*(tapply(lctl_norm.m$value, lctl_norm.m$ctl_probe, sd)))
 
 # NEWBATCH CONTROLS  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -156,10 +136,9 @@ ctl_validation$status = ifelse(ctl_validation$new_batch < ctl_validation$mean.mi
                                       (ctl_validation$new_batch - ctl_validation$mean)/ctl_validation$stddev, "PASS"))
 
 # KNOWN POSITIVES  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+pos_validation = cbind(pos, ctl_validation[rownames(pos),])
 ctl_validation$cellline = sapply(strsplit(as.character(rownames(ctl_validation)), "__"), `[`, 1)
 ctl_validation$antibody = sapply(strsplit(as.character(rownames(ctl_validation)), "__"), `[`, 2)
-pos_validation = cbind(pos, ctl_validation[rownames(pos),])
 
 write.table(ctl_validation, file = "qc_controls.tsv", 
             sep="\t", quote = F, row.names = T, col.names = NA)

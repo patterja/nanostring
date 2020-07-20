@@ -4,8 +4,6 @@
 #   Nanostring output RCC readouts (html format) to raw data matrix
 ## NOTES:
 #   TODO: break out tests
-#       checking sample metrics
-#       check for unique sample names in sample sheet
 #
 ## ARGUMENTS:
 #   samplesheet: tsv of RCC filename in one col and sample name, 'ANTIBODY_REFERENCE.csv'
@@ -21,9 +19,7 @@ import pandas
 import xml.etree.ElementTree as ET
 from functools import reduce
 
-VERSION = "2.0.0"
-
-
+VERSION = "2.0.0.0"
 def supply_args():
     """
     Input arguments
@@ -89,6 +85,26 @@ def parse_Ab_ref(abfile):
                 rabbitAb.append(items[0])
     return(ab_name, rabbitAb, mouseAb)
 
+def make_unique(seq): # Order preserving
+  '''
+  Makes values unique if they are duplicated
+  '''
+  seen = set(seq)
+  if len(seq)==len(seen):
+      print("all values unique")
+      return seq
+  uniq_seq = []
+  for x in seq:
+      if x in uniq_seq:
+          i = 1
+          newx = x + "-" + str(i)
+          while newx in uniq_seq:
+              i = i + 1
+              newx = x + "-" + str(i)
+          uniq_seq.append(x + "-" + str(i))
+      else:
+          uniq_seq.append(x)
+  return uniq_seq
 
 def parse_samplesheet(samplesheet):
     """
@@ -102,13 +118,18 @@ def parse_samplesheet(samplesheet):
     """
     ss_dict = {}
     with open(samplesheet, 'r') as ss:
-        count = 0
         for line in ss:
             items = line.strip().split("\t")
-            ss_dict[count] = items[1]
-            count += 1
-    return (ss_dict)
-
+            rcc_int = int(items[0].split(".")[0][-2:])
+            ss_dict[rcc_int] = items[1]
+    #Fix duplicated sample names by making them unique
+    if len(ss_dict.values())==len(set(ss_dict.values())):
+        return (ss_dict)
+    else:
+        newval = make_unique(ss_dict.values())
+        ss_keys = ss_dict.keys()
+        ss_uniq = dict(zip(ss_keys, newval))
+        return (ss_uniq)
 
 def main():
     args = supply_args()
@@ -121,11 +142,7 @@ def main():
     print(sampleid)
 
     rcc_counts_dict = {}
-    samp_attrib_dict = {}
-    header_dict = {}
-    lane_attrib_dict = {}
-
-
+    samp_metrics_dict = {}
     for file in args.rcc_files:
         if file.endswith(".RCC"):
             # get sample number
@@ -137,51 +154,24 @@ def main():
             dfrcc.rename(columns={'Count': sampleid[samp_number]}, inplace=True)
             rcc_counts_dict[sampleid[samp_number]] = dfrcc
 
-            # df_lane_attrib.rename(columns={df_lane_attrib.columns[1]: sampleid[file]}, inplace=True)
+            #sample_metrics add sample name
             df_lane_attrib = df_lane_attrib.append(
                 pandas.Series(['SampleName', sampleid[samp_number]],
                               index=df_lane_attrib.columns), ignore_index=True)
-            lane_attrib_dict[df_lane_attrib.columns[1]] = df_lane_attrib
+            samp_attrib_df = pandas.DataFrame(samp_attrib + header, columns=df_lane_attrib.columns)
 
-            samp_attrib_dict[sampleid[samp_number]] = samp_attrib
-            header_dict[sampleid[samp_number]] = header
+            df_samp_metrics = pandas.concat([samp_attrib_df, df_lane_attrib])
 
-    # Check header and samp_attribs
-
-    for idx in range(1, len(header_dict)):
-        if list(header_dict.values())[idx - 1] != list(header_dict.values())[idx]:
-            print("RCC header are not equal")
-            # print(header_dict.values()[idx])
-
-    # test to see if samp_attribs are all the same, all RCC files are from same run
-    for idx in range(1, len(samp_attrib_dict)):
-        if list(samp_attrib_dict.values())[idx - 1] != list(samp_attrib_dict.values())[idx]:
-            print("RCC Sample Attributes are not equal")
-            # print(samp_attrib_dict.values()[idx])
-            if samp_attrib_dict.values()[idx][0][1:] == samp_attrib_dict.values()[idx][0][1:]:
-                print("Actually only ID don't match, is this an old RCC file or have chaned RLFs")
-            else:
-                print("RCC Sample Attributes IDs and values are not equal. Stopping")
-                print("Samples are not from one batch. Sample Attributes differ")
-                exit("Error, Check your RCC files")
-        else:
-            print("Samples attribs are okay and are from one batch. OK")
+            df_samp_metrics = df_samp_metrics.set_index('ID')
+            samp_metrics_dict[df_samp_metrics.columns[0]] = df_samp_metrics
 
     # merge dictionary of dataframes together
     raw_data = reduce(lambda x, y: pandas.merge(x, y, on=['CodeClass', 'Name', 'Accession']),
                       rcc_counts_dict.values())
 
-    lane_attrib_combined = reduce(lambda x, y: pandas.merge(x, y, on=['ID']),
-                                  lane_attrib_dict.values())
+    samp_metrics_df = pandas.concat(samp_metrics_dict.values(), axis=1)
 
-    with open("run_metrics.txt", 'w') as met:
-        for item in list(header_dict.values())[0]:
-            met.write('\t'.join(item))
-            met.write('\n')
-        for item in list(samp_attrib_dict.values())[0]:
-            met.write('\t'.join(item))
-            met.write('\n')
-        met.write(lane_attrib_combined.to_csv(sep="\t"))
+    samp_metrics_df.to_csv("run_metrics.txt", sep='\t', index=True)
 
     # Change long name to something else if necessary
     with args.abfile:
