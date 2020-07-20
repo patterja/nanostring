@@ -11,7 +11,9 @@ Pipeline is currently run locally
  - Python version Python 3.7.7
 
 ### Input files
+
 ![Batch Processing Workflow](/images/Canvas 1.png)
+
 ![Combining Batches/Samples Workflow](/images/Canvas 2.png)
 ```
 The <batch_id> is an identifier provided by the technician. It is pre-pended to
