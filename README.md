@@ -12,9 +12,9 @@ Pipeline is currently run locally
 
 ### Input files
 
-![Batch Processing Workflow](images/Canvas1.png)
+![Batch Processing Workflow](nanostring_workflow/Canvas%201.png)
 
-![Combining Batches/Samples Workflow](images/Canvas2.png)
+![Combining Batches/Samples Workflow](nanostring_workflow/Canvas%202.png)
 ```
 The <batch_id> is an identifier provided by the technician. It is pre-pended to
 the samplesheet which is sent to the analyst for processing.
