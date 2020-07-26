@@ -272,7 +272,7 @@ for (samp in setdiff(colnames(new_batch), controls)) {
     theme(legend.position = "bottom")
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   print("saving batch correction plots")
-  png(file=paste0("ruv_figures/",samp,"_TRA.pdf"), width = 800, height = 800)
+  pdf(file=paste0("ruv_figures/",samp,"_TRA.pdf"), width = 8, height = 8)
   plot(ptra)
   dev.off()
   

@@ -348,7 +348,7 @@ ptra=ggplot(tra, aes(x=sample, y=value, fill=sample)) +
 ptra_btwn=ggplot(tra_btwn_batch, aes(x=sample, y=value, fill=sample)) + 
   geom_boxplot() +
   geom_hline(yintercept =0, color="red") +
-  labs(title=paste0("Distribution of TRA between RAW and RUV Corrected between Controls of Batches being compared\n"),
+  labs(title=paste0("Distribution of TRA between RAW and RUV Corrected\n between Controls of Batches being compared"),
        y="log(validation count/new batch count)") +
   theme(legend.position = "bottom")
 
@@ -571,7 +571,7 @@ pheatmap(mat = samps_dat[,samps],
          show_rownames     = TRUE,
          fontsize          = 11,
          main              = sampname,
-         labels_col = gsub("combining_", "", colnames(samps_dat[,samps])))
+         labels_col = gsub("Batch Corrected combining_", "", colnames(samps_dat[,samps])))
 
 
 dev.off()
@@ -582,7 +582,7 @@ dev.off()
 
 pdf(file=paste0(sampname, "_sample_correlation.pdf"), width = 8, height = 6)
 
-pairs(samps_dat, lower.panel = function(x,y,...){points(x,y,...);abline(a = 0,b = 1,...)}, upper.panel = function(x, y) {usr <- par("usr"); on.exit(par(usr)); par(usr = c(0, 1, 0, 1)); r <- round(cor(x, y), digits=2); txt <- paste0("R = ", r); text(0.5, 0.5, txt)},main=paste0("Correlation of ", sampname))
+pairs(samps_dat, lower.panel = function(x,y,...){points(x,y,...);abline(a = 0,b = 1,...)}, upper.panel = function(x, y) {usr <- par("usr"); on.exit(par(usr)); par(usr = c(0, 1, 0, 1)); r <- round(cor(x, y), digits=2); txt <- paste0("R = ", r); text(0.5, 0.5, txt)},main=paste0("RUV corrected Correlation of ", sampname))
 
 print("done with comparison plots saving tables")
 
