@@ -40,6 +40,7 @@ if [ ! -d "${output_dir}" ]; then
 fi
 # change directory to output dir
 cd "${output_dir}"
+echo $PWD
 
 # Step 5:  if rawdata.txt exists process sample batch correction with cohort  and batch QC has been reviewed
 # Step 6: write report for each sample

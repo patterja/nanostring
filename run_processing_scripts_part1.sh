@@ -68,6 +68,8 @@ if [ -e qc_metrics.json ]; then
         if [ "$override" = "true" ]; then
            echo "override is true, running batch QC anyway"
            "${REPO_DIR}""/"process_batch_qc.R -i "rawdata.txt" --pos_file "${known_pos_file}" --validation_file "${validationraw_file}" --md_file "${md_file}"
+        else
+           mv rawdata.txt rawdata_QCFLAG.txt
         fi
     else
         echo "All QC PASS"
