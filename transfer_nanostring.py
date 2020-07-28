@@ -22,7 +22,7 @@ def supply_args():
     Input arguments
     """
     parser = argparse.ArgumentParser(description='Transfer batch from ftp to mounted X drive \n'
-                                                 'Remote = X drive \n'
+                                                 'Remote = remote directory \n'
                                                  'Source = FTP Nanostring machine')
     parser.add_argument('--source_host', type=str, help='host name')
     parser.add_argument('--source_user', type=str, help='user name')
@@ -49,9 +49,9 @@ def prep_remote_dir(batch, remote_data_dir, remote_ss_dir):
 
 
 
-def download(host, user):
+def download(host, user, password):
     # Download some files from the login directory.
-    with ftputil.FTPHost("10.125.46.25", "technician", "MAX123") as ftp_host:
+    with ftputil.FTPHost(host, user, password) as ftp_host:
         names = ftp_host.listdir(ftp_host.curdir)
         for name in names:
             if ftp_host.path.isfile(name):
