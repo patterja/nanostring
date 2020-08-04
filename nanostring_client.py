@@ -31,7 +31,6 @@ class nCounter(FTPHost):
                         print(dest_file)
                         # download only if newer double make sure
                         if not self.path.exists(dest_file):
-                            print("does not exist")
                             self.download_if_newer(fpath,dest_file)
                         else:
                             print(dest_file + " exists already, skipping.")

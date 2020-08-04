@@ -27,6 +27,7 @@ def supply_args():
 
 
 def main():
+    args = supply_args()
     ftp_host = nCounter(args.source_host, args.source_user, args.source_pass)
     backdirs = ["RCCData", "RLFData", "CDFData"]
     for dir in backdirs:
@@ -36,7 +37,7 @@ def main():
         else:
             os.mkdir(destdir)
             ftp_host.download(os.path.join("/", args.source_user, dir), destdir)
-        print("Backing up ", dir)
+        print("Backed up ", dir)
 
     ftp_host.close()
 
