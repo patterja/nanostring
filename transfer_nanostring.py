@@ -49,19 +49,7 @@ def prep_remote_dir(batch, remote_data_dir, remote_ss_dir):
 
 
 
-def download(host, user, password):
-    # Download some files from the login directory.
-    with ftputil.FTPHost(host, user, password) as ftp_host:
-        names = ftp_host.listdir(ftp_host.curdir)
-        for name in names:
-            if ftp_host.path.isfile(name):
-                print(name)
-                ftp_host.download(name, name)  # remote, local
-        # Make a new directory and copy a remote file into it.
-        ftp_host.mkdir("newdir")
-        with ftp_host.open("index.html", "rb") as source:
-            with ftp_host.open("newdir/index.html", "wb") as target:
-                ftp_host.copyfileobj(source, target)  # similar to shutil.copyfileobj
+
 def main():
     args = supply_args()
     zfile = args.batch + "_RCC.ZIP"
@@ -83,6 +71,9 @@ def main():
     if os.path.isdir(data_dir):
         with zipfile.ZipFile(zfile_path,'r') as zobj:
             zobj.extractall(data_dir)
+    #move zip file to zipfile directory
+    shutil.move(zfile_path, os.path.join(args.remote_data_dir, "RCCData", zfile))
+
 
 if __name__ == "__main__":
     main()
