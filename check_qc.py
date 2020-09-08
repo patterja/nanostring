@@ -49,18 +49,18 @@ def checkFOV(fov_count, fov_counted):
 
 def check_binding_density(bd):
     """
-    Binding density threshold 0.1-0.8 SPRINT
+    Binding density threshold 0.1-0.8 SPRINT, 0.1-2.25 for max
     :param bd: double
     :return: dict qc="PASS/FAIL"
     """
     bd=float(bd)
-    if bd > 0.1 and bd < 1.8:
+    if bd >= 0.1 and bd <= 2.25:
         qc = "PASS"
     else:
         qc = "FAIL"
 
     bd_dict = {"value": bd,
-               "threshold": "0.1-1.8",
+               "threshold": "0.1-2.25",
                "qc": qc}
     return bd_dict
 
@@ -109,21 +109,21 @@ def check_pos_linearity(dat, samp):
     conc = []
     for pos in pos_name:
         val=float(re.search(rexp, pos).group())
-        val=math.log(val)
+        val=math.log(sum([val,1]))
         conc.append(val)
 
     list_pos = dat.loc[pos_name, samp].tolist()
-    list_pos = [math.log(float(i)) for i in list_pos]
+    list_pos = [math.log(sum([float(i),1])) for i in list_pos]
     #list_pos = [float(i) for i in list_pos]
     cor_df = pandas.DataFrame({'conc':conc, 'pos': list_pos})
     corval= (cor_df.corr().iloc[0]) * (cor_df.corr().iloc[0])
 
-    if float(corval.loc['pos']) > 0.90:
+    if round(corval.loc['pos'],1) >= 0.90:
         qc = "PASS"
     else:
         qc = "FAIL"
 
-    pos_linear_dict = {"value": round(corval.loc['pos'],3), "threshold": ">0.90","qc": qc}
+    pos_linear_dict = {"value": round(corval.loc['pos'],1), "threshold": ">0.9","qc": qc}
 
     return pos_linear_dict
 
@@ -136,7 +136,7 @@ def main():
     samps = raw_data.columns.drop(['CodeClass', 'Name', 'Accession'])
 
     qc = {}
-    for i in range(1,len(samps)):
+    for i in range(0,len(samps)):
         qc_samp={}
         samp = samps[i]
         met = run_metrics[[samp]]
