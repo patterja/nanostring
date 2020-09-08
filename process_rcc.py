@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
 ## USAGE:
-#   Nanostring output RCC readouts (html format) to raw data matrix
+#   Nanostring output RCC readouts for processing whole slide assay nCounter data
+#   (html format) to raw data matrix
 ## NOTES:
 #   TODO: break out tests
 #
@@ -19,7 +20,7 @@ import pandas
 import xml.etree.ElementTree as ET
 from functools import reduce
 
-VERSION = "2.0.0.0"
+VERSION = "1.0.0.0"
 def supply_args():
     """
     Input arguments
@@ -29,6 +30,7 @@ def supply_args():
     parser.add_argument('rcc_files', type=str, nargs='+', help='raw RCC files')
     parser.add_argument('--samplesheet', type=str, help='samplesheet.txt')
     parser.add_argument('--abfile', type=argparse.FileType('r'), help='ANTIBODY_REFERENCE.csv')
+    parser.add_argument('--omit_blank', action='store_true', help='Omitt Blank Samples')
     parser.add_argument('--version', action='version', version='%(prog)s ' + VERSION)
     args = parser.parse_args()
     return args
@@ -118,6 +120,7 @@ def parse_samplesheet(samplesheet):
     """
     ss_dict = {}
     with open(samplesheet, 'r') as ss:
+        next(ss)
         for line in ss:
             items = line.strip().split("\t")
             rcc_int = int(items[0].split(".")[0][-2:])
@@ -144,26 +147,26 @@ def main():
     rcc_counts_dict = {}
     samp_metrics_dict = {}
     for file in args.rcc_files:
-        if file.endswith(".RCC"):
+        #if file.endswith(".RCC"): #only works for non-galaxy instance
             # get sample number
             # samp_number = re.sub(".RCC", "", file.split("_")[-1])
-            dfrcc, header, samp_attrib, df_lane_attrib = parseRCC(file)
+        dfrcc, header, samp_attrib, df_lane_attrib = parseRCC(file)
 
-            samp_number = int(df_lane_attrib.columns[1])
-            # rename column name with sample id for rcc files
-            dfrcc.rename(columns={'Count': sampleid[samp_number]}, inplace=True)
-            rcc_counts_dict[sampleid[samp_number]] = dfrcc
+        samp_number = int(df_lane_attrib.columns[1])
+        # rename column name with sample id for rcc files
+        dfrcc.rename(columns={'Count': sampleid[samp_number]}, inplace=True)
+        rcc_counts_dict[sampleid[samp_number]] = dfrcc
 
-            #sample_metrics add sample name
-            df_lane_attrib = df_lane_attrib.append(
-                pandas.Series(['SampleName', sampleid[samp_number]],
-                              index=df_lane_attrib.columns), ignore_index=True)
-            samp_attrib_df = pandas.DataFrame(samp_attrib + header, columns=df_lane_attrib.columns)
+        #sample_metrics add sample name
+        df_lane_attrib = df_lane_attrib.append(
+            pandas.Series(['SampleName', sampleid[samp_number]],
+                          index=df_lane_attrib.columns), ignore_index=True)
+        samp_attrib_df = pandas.DataFrame(samp_attrib + header, columns=df_lane_attrib.columns)
 
-            df_samp_metrics = pandas.concat([samp_attrib_df, df_lane_attrib])
+        df_samp_metrics = pandas.concat([samp_attrib_df, df_lane_attrib])
 
-            df_samp_metrics = df_samp_metrics.set_index('ID')
-            samp_metrics_dict[df_samp_metrics.columns[0]] = df_samp_metrics
+        df_samp_metrics = df_samp_metrics.set_index('ID')
+        samp_metrics_dict[df_samp_metrics.columns[0]] = df_samp_metrics
 
     # merge dictionary of dataframes together
     raw_data = reduce(lambda x, y: pandas.merge(x, y, on=['CodeClass', 'Name', 'Accession']),
@@ -171,7 +174,6 @@ def main():
 
     samp_metrics_df = pandas.concat(samp_metrics_dict.values(), axis=1)
 
-    samp_metrics_df.to_csv("run_metrics.txt", sep='\t', index=True)
 
     # Change long name to something else if necessary
     with args.abfile:
@@ -182,7 +184,26 @@ def main():
         if not re.search("POS|NEG", name[1]):
             # print(name)
             raw_data['Name'][name[0]] = ab_name[name[1].strip().split("|")[0]]
+    print(raw_data.columns)
 
+    #omit blanks if flag is true
+    #removes samples whose counts sum to zero.
+    idx_of_samples = []
+    if args.omit_blank == True:
+        for label, content in raw_data.items():
+            lastvalue = content.values[-1]
+            try:
+                int(lastvalue)
+                colsum = content.astype('int').sum()
+                if colsum > 0:
+                    idx_of_samples.append(label)
+            except ValueError:
+                pass
+        raw_data = raw_data[['CodeClass', 'Name', 'Accession'] + idx_of_samples]
+        smet_boolidx = samp_metrics_df.loc['SampleName'].isin(idx_of_samples)
+        samp_metrics_df = samp_metrics_df[smet_boolidx.index[smet_boolidx]]
+
+    samp_metrics_df.to_csv("run_metrics.txt", sep='\t', index=True)
     raw_data.to_csv("rawdata.txt", sep='\t', index=False)
 
 if __name__ == "__main__":

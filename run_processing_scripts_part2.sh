@@ -26,10 +26,10 @@ ss_dir="${DATA_DIR}""/""automated_data/""$NEWBATCH"
 output_dir="${DATA_DIR}""/""output/""$NEWBATCH"
 #files
 FILES=("${DATA_DIR}""/""automated_data/"$NEWBATCH"/*RCC")
-abfile="${DATA_DIR}""/""REFERENCE_FILES/ANTIBODY_REFERENCE_v"${antibody_version}".csv"
-known_pos_file="${DATA_DIR}""/""REFERENCE_FILES/knownpositives_v"${knownpos_version}".txt"
-validationraw_file="${DATA_DIR}""/""REFERENCE_FILES/validation_samples_rawdata_"${valid_version}".txt"
-ihc_file="${DATA_DIR}""/""REFERENCE_FILES/ihc_status_"${ihc_version}".txt"
+abfile="${DATA_DIR}""/""Assay_Whole_Slide/REFERENCE_FILES/ANTIBODY_REFERENCE_v"${antibody_version}".csv"
+known_pos_file="${DATA_DIR}""/""Assay_Whole_Slide/REFERENCE_FILES/knownpositives_v"${knownpos_version}".txt"
+validationraw_file="${DATA_DIR}""/""Assay_Whole_Slide/REFERENCE_FILES/validation_samples_rawdata_"${valid_version}".txt"
+ihc_file="${DATA_DIR}""/""Assay_Whole_Slide/REFERENCE_FILES/ihc_status_"${ihc_version}".txt"
 md_file="/Users/patterja/Box/NANOSTRING/nanostring_metadata.xlsx"
 
 #Step 4: check output directory exists and step1 was run 

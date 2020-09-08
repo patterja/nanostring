@@ -13,9 +13,10 @@ ihc_version="20200507"
 knownpos_version="1.0"
 antibody_version="1.0"
 
-#cd "/Users/patterja/Box\ Sync/NANOSTRING/data/${smmart}"
+#second flag is true/false will include or exclude blanks 
 NEWBATCH=$(basename "$1")
-override=$2
+omit_blank=$2
+
 echo $NEWBATCH
 DATA_DIR="/Volumes/OHSU/CLINICAL/Nanostring"
 REPO_DIR="/Users/patterja/Workspace/nanostring/nanostring"
@@ -24,10 +25,10 @@ ss_dir="${DATA_DIR}""/""automated_data/""$NEWBATCH"
 output_dir="${DATA_DIR}""/""output/""$NEWBATCH"
 #files
 FILES=("${DATA_DIR}""/""automated_data/"$NEWBATCH"/*RCC")
-abfile="${DATA_DIR}""/""REFERENCE_FILES/ANTIBODY_REFERENCE_v"${antibody_version}".csv"
-known_pos_file="${DATA_DIR}""/""REFERENCE_FILES/knownpositives_v"${knownpos_version}".txt"
-validationraw_file="${DATA_DIR}""/""REFERENCE_FILES/validation_samples_rawdata_"${valid_version}".txt"
-ihc_file="${DATA_DIR}""/""REFERENCE_FILES/ihc_status_"${ihc_version}".txt"
+abfile="${DATA_DIR}""/""Assay_Whole_Slide/REFERENCE_FILES/ANTIBODY_REFERENCE_v"${antibody_version}".csv"
+known_pos_file="${DATA_DIR}""/""Assay_Whole_Slide/REFERENCE_FILES/knownpositives_v"${knownpos_version}".txt"
+validationraw_file="${DATA_DIR}""/""Assay_Whole_Slide/REFERENCE_FILES/validation_samples_rawdata_"${valid_version}".txt"
+ihc_file="${DATA_DIR}""/""Assay_Whole_Slide/REFERENCE_FILES/ihc_status_"${ihc_version}".txt"
 md_file="/Users/patterja/Box/NANOSTRING/nanostring_metadata.xlsx"
 
 #find samplesheet
@@ -42,7 +43,12 @@ if test -f "$ss"; then
     echo "dir made"
     cd "${output_dir}" 
     echo `pwd`
-    /usr/local/bin/python3 "${REPO_DIR}""/"process_rcc.py --samplesheet "$ss" --abfile "${abfile}" ${FILES[@]}
+    if [ "$omit_blank" = "true" ]; then
+        echo "omitting blank RCCs"
+        /usr/local/bin/python3 "${REPO_DIR}""/"process_rcc.py --omit_blank --samplesheet "$ss" --abfile "${abfile}" ${FILES[@]}
+    else
+        /usr/local/bin/python3 "${REPO_DIR}""/"process_rcc.py --samplesheet "$ss" --abfile "${abfile}" ${FILES[@]}
+    fi
 else
     echo "no samplesheet"
     exit 1
@@ -64,12 +70,12 @@ if [ -e qc_metrics.json ]; then
     echo "entering"
     pf=$(cat qc_metrics.json | jq '.[] | .[] | .qc' | sort | uniq -c | grep "FAIL")
     if [[ ! -z "$pf" ]]; then #check if any pass/fail flag is not empty, something failed
+        echo $NEWBATCH
         echo "check qc_metrics.json. QC flag failed"
-        if [ "$override" = "true" ]; then
-           echo "override is true, running batch QC anyway"
-           "${REPO_DIR}""/"process_batch_qc.R -i "rawdata.txt" --pos_file "${known_pos_file}" --validation_file "${validationraw_file}" --md_file "${md_file}"
+        if [ "$omit_blank" = "true" ]; then
+           echo "keepting rawdata.txt as is. CHECK QC FLAGS AND SAMPLES!"
         else
-           mv rawdata.txt rawdata_QCFLAG.txt
+          mv rawdata.txt rawdata_QCFLAG.txt
         fi
     else
         echo "All QC PASS"
