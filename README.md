@@ -1,9 +1,9 @@
 ## Analysis of Nanostring nCounter Vantage Protein Whole Slide Assay
-Level 1
+##### Level 1
 Signals are measured using the MAX/FLEX nCounter® Analysis System (Manual/Info)
 This is the data in /X/Histopathology/Histopathology\ Shared\ Resource/CLINICAL/Nanostring/output/<batch_name>/rawdata.txt
 
-Level 2 data
+##### Level 2 data
 Based on Level 1 data, batch correction is preformed using factor analysis with removal of the wanted variation (RUV) method (Molania et al., 2019). RUV is preformed using a combination of  the “negative” antibody controls, MmAb-IgG1 and MmAb-IgG2, the negative and positive Hybridization ERCC spikes and the total S6 and total Histone H3 antibody signals. Any variation associated observed within 20 replicates of cell line technical replicates will be removed. 
 Batches correction is performed with a cohort of 57 metastatic breast cancers. Consisting of:
  - 31: Breast Cancer not on Treatment
@@ -11,11 +11,11 @@ Batches correction is performed with a cohort of 57 metastatic breast cancers. C
  - 6: Triple Negative Breast Cancer on Treatment
 This is the data in /X/Histopathology/Histopathology\ Shared\ Resource/CLINICAL/Nanostring/output
 
-Level 3 data
+##### Level 3 data
 Based on Level 1 data, batch correction is performed as describe in Level 2 including only batches containing samples of interest are combined, removing batch associated variation present only within the specified batches. 
 This is the data in /X/Histopathology/Histopathology\ Shared\ Resource/CLINICAL/Nanostring/output_combining
 
-*When analyzing the RPPA data:* 
+**When analyzing the RPPA data:** 
  - For a single sample profiled in a single batch or multiple samples on the a single batch, either Level 1 or Level 2 should be good for analysis.
  - For multiple samples profiled in multiple batches, Level 3 is ideal because
    batch effects could occur among different batches. Level 2 could be used
