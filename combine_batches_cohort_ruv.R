@@ -9,7 +9,6 @@ suppressPackageStartupMessages(library(reshape2))
 suppressPackageStartupMessages(library(pheatmap))
 suppressPackageStartupMessages(library(openxlsx))
 suppressPackageStartupMessages(library(ruv))
-suppressPackageStartupMessages(library(nanoprot))
 suppressPackageStartupMessages(library(gridExtra))
 
 version="4.0"
@@ -20,13 +19,15 @@ parser <- ArgumentParser()
 parser$add_argument("--data_dir", type="character", default="/Volumes/OHSU/CLINICAL/Nanostring/output", 
                     dest="data_dir", help="directory name")
 parser$add_argument("--comb_sheet", type="character", dest="comb_sheet", help="ruv samplesheet")
-parser$add_argument("--validation_file", type="character",default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/validation_samples_rawdata_", mat_version, ".txt"),
+parser$add_argument("--validation_file",
+type="character",default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/Assay_Whole_Slide/REFERENCE_FILES/validation_samples_rawdata_", mat_version, ".txt"),
                     dest="validation_file", help="validation file for controls comparison")
 parser$add_argument("--md_file", type="character", default= "/Users/patterja/Box/NANOSTRING/nanostring_metadata.xlsx",
                     dest="mbc_md_file", help="metastatic breast cancer metadata file")
-parser$add_argument("--ihc_file", type="character", default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ihc_status_", ihc_version, ".txt"),
+parser$add_argument("--ihc_file", type="character",
+default=paste0("/Volumes/OHSU/CLINICAL/Nanostring/Assay_Whole_Slide/REFERENCE_FILES/ihc_status_", ihc_version, ".txt"),
                     dest="ihc_file", help="ihc file")
-parser$add_argument("--ab_ref_file", type="character", default= "/Volumes/OHSU/CLINICAL/Nanostring/REFERENCE_FILES/ANTIBODY_REFERENCE_v1.0.csv",
+parser$add_argument("--ab_ref_file", type="character", default="/Volumes/OHSU/CLINICAL/Nanostring/Assay_Whole_Slide/REFERENCE_FILES/ANTIBODY_REFERENCE_v1.0.csv",
                     dest="ab_ref_file", help="ANTIBODY_REFERENCE.csv")
 parser$add_argument("--include_ctrls", action="store_true", default=FALSE,
                     dest="include_ctrls", help="include all antibodies")
@@ -50,6 +51,65 @@ ab.ctrl = "IgG|POS|NEG|^S6|^Histone"
 
 
 #FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+get_legend<-function(myggplot){
+  tmp <- ggplot_gtable(ggplot_build(myggplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)
+}
+pcaplot <- function (mat, title = "PCA Plot", col=rownames(mat)) {
+  #' pca
+  #'
+  #' @param mat (matrix/dataframe):  mat
+  #' @param title (character) :
+  #' @param subtype (dataframe metadata) : rownames correspnond to
+  #' @param labe (character) : rownames correspnond to
+  #' @export
+  #' @return ggplot
+  col = c(col)
+  var = mat[apply(mat, 1, var, na.rm = TRUE) != 0, ]
+  cc.var = var[complete.cases(var), ]
+  pca_prcomp = prcomp(t(var), center = T, scale = F)
+  PC1_and_PC2 = data.frame(PC1 = pca_prcomp$x[, 1], PC2 = pca_prcomp$x[,2], type = rownames(pca_prcomp$x))
+  perc = (pca_prcomp$sdev^2)/sum(pca_prcomp$sdev^2) * 100
+  labs <- sapply(seq_along(perc), function(i) {
+    paste("PC ", i, " (", round(perc[i], 2), "%)", sep = "")})
+  
+  PCsmd = cbind(PC1_and_PC2, col=col)
+  levs = levels(factor(col))
+  cols =c("#E41A1C","#377EB8","#4DAF4A","#984EA3","#FF7F00","#FFFF33","#A65628","#F781BF","#999999","#8DD3C7","#FFFFB3",
+          "#BEBADA","#FB8072","#80B1D3","#FDB462","#B3DE69","#FCCDE5","#D9D9D9","#BC80BD","#CCEBC5","#FFED6F",
+          "#E41A1C","#377EB8","#4DAF4A","#984EA3","#FF7F00","#FFFF33","#A65628","#F781BF","#999999","#8DD3C7","#FFFFB3",
+          "#BEBADA","#FB8072","#80B1D3","#FDB462","#B3DE69","#FCCDE5","#D9D9D9","#BC80BD","#CCEBC5","#FFED6F")
+  p = ggplot(PCsmd,aes_string("PC1", "PC2", col="col")) +
+    geom_point(size = 1.5) +
+    geom_text(aes(label = PCsmd$type), vjust = -1, size=2) +
+    labs(title = title,x = labs[1], y = labs[2]) +
+    theme(panel.background = element_rect(fill = "white"),
+          panel.grid.major = element_line(colour = "gray90"),
+          panel.border = element_rect(colour = "gray90", fill=NA),
+          plot.title = element_text(hjust = 0.5),
+          legend.text = element_text(size = 4), legend.position = "right") +
+    scale_colour_manual(values =cols[1:length(levs)]) +
+    xlim(-20,20) +ylim(-9,9)
+  return(p)
+}
+
+rel_log_exp <- function (Y)
+  #' relative log expression calculation
+  #'
+  #' @param Y data matrix. Rows are observations and columns are features (e.g. genes).
+  #' @return numeric
+  #' @export
+{
+  features = colnames(Y)
+  print(paste0("Using columns as features.\nFeatures are: ", paste0(features[1:10], collapse=","), "..."))
+  
+  Yrle = apply(Y, 2, function(x) x-median(x))
+  
+  return(Yrle)
+}
+## OUTPUT PREP ##~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #outdirectory. Not sure how this will integrate with galaxy
 outdir = dirname(normalizePath(comb_sheet))
@@ -68,11 +128,6 @@ md$sampcolumn = make.names(paste0(md$Batch, "__", md$Sample.Name))
 
 # antibody metadata 
 ab_ref = read.csv(ab_ref_file, sep=",", stringsAsFactors=F)
-pathways = data.frame(ab_ref$X.AbID, Pathway = sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 1))
-pathways = rbind(pathways, data.frame(ab_ref$X.AbID, Pathway=sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 2)))
-pathways = rbind(pathways, data.frame(ab_ref$X.AbID, Pathway=sapply(strsplit(as.character(ab_ref$Pathway), ","), `[`, 3)))
-
-pathways = pathways[complete.cases(pathways),]
 
 #~ validation
 validation = read.csv(validation_file, sep= "\t", row.names = 1, check.names = T)
@@ -377,13 +432,13 @@ if (include_ctrls){
   fbcdat = bcdat
   other_abs=setdiff(colnames(bcdat),ab_ref$X.AbID)
   ab_order = c(ab_ref$X.AbID[order(ab_ref$Target)], other_abs)
-  pathways = pathways[pathways$ab_ref.X.AbID %in% ab_order,]
+  pathways = ab_ref$Pathway[ab_ref$X.AbID %in% ab_order]
 } else {
   fbcdat = bcdat[!grepl(omitregex, rownames(bcdat)),]
   #AB_ORDER
   ab_order = ab_ref$X.AbID[order(ab_ref$Target)]
   ab_order = ab_order[!grepl(omitregex, ab_order)]
-  pathways = pathways[pathways$ab_ref.X.AbID %in% ab_order,]
+  pathways = ab_ref$Pathway[ab_ref$X.AbID %in% ab_order]
 }
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~ SPLITTING AND MELTING~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -533,32 +588,61 @@ for (coh in unique(comb_cohorts$ab)){
   samp_cohorts_box = rbind(samp_cohorts_box, data.frame(samp_cohorts, "ab"=coh))}
 comb_cohorts_box$Var1 = factor(comb_cohorts$Var1, levels=ab_order)
 samp_cohorts_box$Var1 = factor(samp_cohorts_box$Var1, levels=ab_order)
-
-#~ BOXPLOTS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~ BOXPLOTS~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~new
 palette = c("#FF0000FF","#004CFFFF","#00A600FF","#984ea3","#ff7f00","#a65628")
-bp = ggplot(comb_cohorts_box, aes(x=ab, y=value)) + 
-  geom_boxplot() +
-  geom_point(data=samp_cohorts_box[samp_cohorts_box$detectable==TRUE,], mapping=aes(x=ab, y=newvalue, colour=Var2), shape=8, size=2, show.legend =TRUE) +
-  geom_text(data=samp_cohorts_box[samp_cohorts_box$detectable==FALSE,], mapping=aes(x=ab, y=newvalue, colour=Var2), label="ND", size=3, position=position_jitter(width=c(0.03))) +
-  facet_wrap(~Var1, scale="free") +
-  labs(x="cohort", y="log batch corrected counts", title=sampname) +
-  scale_color_manual(values=palette[1:length(samps)]) +
-  theme(panel.background = element_rect(fill = "white"),
-        panel.grid.major=element_line(colour="gray90"),
-        plot.title = element_text(hjust = 0.5, vjust=0),
-        legend.title = element_blank(),
-        legend.text=element_text(size=9),
-        legend.position="bottom",
-        axis.text.x = element_text(size=6, colour=c("black")),
-        axis.text.y = element_text(size=9, colour="black")) +
-  guides(colour=guide_legend(ncol=1))
-  
 
-print("boxplot plotted")
-pdf(file=sprintf("%s_boxplots.pdf", sampname), width=10, height=9.5)
-print(bp)
+pwboxlist = list()
+
+for (pathway in unique(ab_ref$Pathway[order(ab_ref$Pathway.Order)])){
+  if (!pathway %in% c("Non-specific")){
+    ab_o = order(ab_ref$Target[ab_ref$Pathway==pathway])
+    antibodies = ab_ref$X.AbID[ab_ref$Pathway==pathway][ab_o]
+    comb_cohorts_box = comb_cohorts[comb_cohorts$Var1 %in% antibodies,]
+    comb_cohorts_box$Var1 = factor(comb_cohorts_box$Var1, levels=antibodies)
+    
+    samp_cohorts_boxab = samp_cohorts_box[samp_cohorts_box$Var1 %in% antibodies,]
+    samp_cohorts_boxab$Var2 = as.factor(gsub("combining_X","", samp_cohorts_boxab$Var2))
+    colortable = setNames(palette[1:length(levels(samp_cohorts_boxab$Var2))],nm=levels(samp_cohorts_boxab$Var2))
+
+    bp = ggplot(comb_cohorts_box, aes(x=ab, y=value)) + 
+      geom_boxplot() +
+      facet_wrap(~Var1, scale="free", nrow=1) +
+      geom_point(data=samp_cohorts_boxab[samp_cohorts_boxab$detectable==TRUE,], mapping=aes(x=ab, y=newvalue, colour=Var2),shape=8, size=2, position=position_jitter(width=c(0.01)))+
+      geom_text(data=samp_cohorts_boxab[samp_cohorts_boxab$detectable==FALSE,], mapping=aes(x=ab, y=newvalue, colour=Var2), label="ND", size=3, position=position_jitter(width=c(0.02))) +
+      scale_color_manual(values = colortable) +
+      labs(y="log batch corrected counts", title=pathway) +
+      theme(panel.background = element_rect(fill = "white"),
+            panel.grid.major=element_line(colour="gray90"),
+            plot.title = element_text(hjust = 0.5, vjust=0, face="bold", size=10),
+            legend.position="none",
+            axis.title.x = element_blank(),
+            axis.title.y = element_text(size=6),
+            axis.text.x = element_text(size=6, colour=c("black"),angle=15),
+            axis.text.y = element_text(size=6, colour="black"),
+            plot.margin=unit(c(-0.1,0.1,-0.1,0.1), "cm"))
+    
+    pwboxlist[[pathway]] = bp
+  }
+}
+#grab the legend from to add it to the combined plot
+legbp =  ggplot() + 
+  geom_point(data=samp_cohorts_boxab[samp_cohorts_boxab$detectable==TRUE,], mapping=aes(x=ab, y=newvalue, colour=Var2),shape=8, size=2, position=position_jitter(width=c(0.01)))+
+  geom_text(data=samp_cohorts_boxab[samp_cohorts_boxab$detectable==FALSE,], mapping=aes(x=ab, y=newvalue, colour=Var2), label="ND", size=3, position=position_jitter(width=c(0.02))) +
+  scale_color_manual(values = colortable) +
+  theme(legend.position="right")
+        
+
+pwboxlist[["legend"]]=get_legend(legbp)
+lay <- rbind(c(1,NA,2,2,2,2),
+             c(3,3,3,3,3,3),
+             c(4,4,4,4,NA,NA),
+             c(5,5,5,7,7,7),
+             c(6,6,6,6,6,NA))
+
+pdf(file=sprintf("%s_boxplots.pdf", sampname), width=10, height=10)
+
+grid.arrange(grobs=pwboxlist,layout_matrix=lay, top=sampname)
 dev.off()
-
 
 #~ HEATMAP #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 pdf(file=paste0(sampname, "_samples_heatmap.pdf"), width = 4.5, height = 10)

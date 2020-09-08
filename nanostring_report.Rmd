@@ -40,12 +40,12 @@ omitregex = paste0(paste0("^", omit), collapse = "|")
 ab.ctrl = "IgG|POS|NEG|^S6|^Histone"
 ```
 
-
-```{r, include=TRUE, fig.align="center", echo=FALSE}
+\pagebreak
+```{r boxplot, include=TRUE, fig.align="center", echo=FALSE}
 knitr::include_graphics(file.path(data_dir, sprintf("%s_boxplots.pdf", samp)), auto_pdf = T)
 
 ```
-
+\pagebreak
 ```{r, echo=FALSE, results='asis'}
 
 
@@ -62,7 +62,7 @@ for (batchsamp in names(filt_qc)){
 }
 
 ```
-
+\pagebreak
 ```{r, echo=FALSE}
 
 qc_controls = read.table(file.path(data_dir, "qc_controls_positive.tsv"), sep="\t", header=T, row.names = 1)
