@@ -13,7 +13,7 @@ class nCounter(FTPHost):
     inheriting from ftputil.FTPHost
     '''
 
-    def download(self, source_dir, dest_dir):
+    def download_datadir(self, source_dir, dest_dir):
         '''
         :param source_dir: /technician/RCCData, /technician/RLFData, /technician/CLFData
         :param dest_dir: dest directory name the directory RCCData, RLFData, CLFData
@@ -38,18 +38,21 @@ class nCounter(FTPHost):
             print("FTP dir is "+ self.getcwd())
             print(self.listdir(self.curdir))
 
-    def download_batch(self, batch, user):
+    def download_batch(self, batch, dest_dir):
         '''
         :param batch: batch id only, path to file /technician/RCCData is taken care of
         :return: download zip to current directory
         '''
         zfile = batch + "_RCC.ZIP"
-        batchpath = self.path.join("/", user, "RCCData")
+        batchpath = self.path.join("./RCCData")
         zfiles = self.listdir(batchpath)
         if zfile in zfiles:
-            self.download(os.path.join(batchpath, zfile), zfile)
+            dest_file = os.path.join(dest_dir, zfile)
+            print(zfile + " to ", dest_file)
+
+            self.download(os.path.join(batchpath, zfile), dest_file)
         else:
-            print("no " + zfile)
+            print(zfile + " DOES NOT EXIST")
             print(zfiles)
 
 

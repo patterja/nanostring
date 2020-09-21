@@ -33,10 +33,10 @@ def main():
     for dir in backdirs:
         destdir = os.path.join(args.dest, dir)
         if os.path.isdir(destdir):
-            ftp_host.download(os.path.join("/",args.source_user, dir),destdir)
+            ftp_host.download_datadir(os.path.join("/",args.source_user, dir),destdir)
         else:
             os.mkdir(destdir)
-            ftp_host.download(os.path.join("/", args.source_user, dir), destdir)
+            ftp_host.download_datadir(os.path.join("/", args.source_user, dir), destdir)
         print("Backed up ", dir)
 
     ftp_host.close()
