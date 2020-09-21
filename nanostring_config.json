@@ -1,0 +1,15 @@
+{
+  "nCounterFTP": {
+    "host": "10.125.46.25",
+    "user": "technician",
+    "password": "max123"
+  },
+  "exanas": {
+    "host": "exanas01.ohsu.edu",
+    "exanas_destdir": "/home/exacloud/clinicalarchive/KDL/Nanostring"
+  },
+  "Xdrive": {
+    "automated_datadir": "/Volumes/OHSU/CLINICAL/Nanostring/automated_data",
+    "samplesheet_dir": "/Volumes/OHSU/CLINICAL/Nanostring/samplesheets"
+  }
+}

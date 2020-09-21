@@ -4,6 +4,7 @@
 #   transfer_FTP2exanas.py --source_host host --source_user user --source_pass password --dest destination dirname
 import argparse
 import os
+import json
 from nanostring_client import nCounter
 
 VERSION="1.0.0"
@@ -13,14 +14,7 @@ def supply_args():
     """
     Input arguments
     """
-    parser = argparse.ArgumentParser(description='Transfer batch from ftp to mounted X drive \n'
-                                                 'Remote = remote directory \n'
-                                                 'Source = FTP Nanostring machine')
-    parser.add_argument('--source_host', type=str, help='host name')
-    parser.add_argument('--source_user', type=str, help='user name')
-    parser.add_argument('--source_pass', type=str, help='password')
-    parser.add_argument('--dest', type=str, help='remote automated_data dir path',
-                        default="/home/exacloud/clinicalarchive/KDL/Nanostring")
+    parser = argparse.ArgumentParser(description='Transfer to exanas')
     args = parser.parse_args()
     return args
 
@@ -28,10 +22,14 @@ def supply_args():
 
 def main():
     args = supply_args()
-    ftp_host = nCounter(args.source_host, args.source_user, args.source_pass)
+    with open("nanostring_config.json", 'r') as cfgfile:
+        cfg = json.load(cfgfile)
+
+    #Back up entire nCounter system to exanas01
+    ftp_host = nCounter(cfg['nCounterFTP']['host'], cfg['nCounterFTP']['user'], cfg['nCounterFTP']['password'])
     backdirs = ["RCCData", "RLFData", "CDFData"]
     for dir in backdirs:
-        destdir = os.path.join(args.dest, dir)
+        destdir = os.path.join(cfg['exanas']['exanas_destdir'], dir)
         if os.path.isdir(destdir):
             ftp_host.download_datadir(os.path.join("/",args.source_user, dir),destdir)
         else:
