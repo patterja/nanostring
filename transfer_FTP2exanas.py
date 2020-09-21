@@ -31,14 +31,13 @@ def main():
     for dir in backdirs:
         destdir = os.path.join(cfg['exanas']['exanas_destdir'], dir)
         if os.path.isdir(destdir):
-            ftp_host.download_datadir(os.path.join("/",args.source_user, dir),destdir)
+            ftp_host.download_datadir(os.path.join("/",cfg['nCounterFTP']['user'],destdir)
         else:
             os.mkdir(destdir)
-            ftp_host.download_datadir(os.path.join("/", args.source_user, dir), destdir)
+            ftp_host.download_datadir(os.path.join("/", cfg['nCounterFTP']['user'], dir), destdir)
         print("Backed up ", dir)
 
     ftp_host.close()
-
 
 if __name__ == "__main__":
     main()
