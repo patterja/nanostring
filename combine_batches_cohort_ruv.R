@@ -16,7 +16,8 @@ mat_version = "20200512"
 ihc_version = "20200507"
 
 parser <- ArgumentParser()
-parser$add_argument("--data_dir", type="character", default="/Volumes/OHSU/CLINICAL/Nanostring/output", 
+parser$add_argument("--data_dir", type="character",
+default="/Volumes/OHSU/CLINICAL/Nanostring/Assay_Whole_Slide/output", 
                     dest="data_dir", help="directory name")
 parser$add_argument("--comb_sheet", type="character", dest="comb_sheet", help="ruv samplesheet")
 parser$add_argument("--validation_file",
@@ -628,7 +629,7 @@ for (pathway in unique(ab_ref$Pathway[order(ab_ref$Pathway.Order)])){
 legbp =  ggplot() + 
   geom_point(data=samp_cohorts_boxab[samp_cohorts_boxab$detectable==TRUE,], mapping=aes(x=ab, y=newvalue, colour=Var2),shape=8, size=2, position=position_jitter(width=c(0.01)))+
   geom_text(data=samp_cohorts_boxab[samp_cohorts_boxab$detectable==FALSE,], mapping=aes(x=ab, y=newvalue, colour=Var2), label="ND", size=3, position=position_jitter(width=c(0.02))) +
-  scale_color_manual(values = colortable) +
+  scale_color_manual(name="BatchName__SampleName", values = colortable) +
   theme(legend.position="right")
         
 

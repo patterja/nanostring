@@ -22,7 +22,7 @@ DATA_DIR="/Volumes/OHSU/CLINICAL/Nanostring"
 REPO_DIR="/Users/patterja/Workspace/nanostring/nanostring"
 
 ss_dir="${DATA_DIR}""/""automated_data/""$NEWBATCH"
-output_dir="${DATA_DIR}""/""output/""$NEWBATCH"
+output_dir="${DATA_DIR}""/""Assay_Whole_Slide/output/""$NEWBATCH"
 #files
 FILES=("${DATA_DIR}""/""automated_data/"$NEWBATCH"/*RCC")
 abfile="${DATA_DIR}""/""Assay_Whole_Slide/REFERENCE_FILES/ANTIBODY_REFERENCE_v"${antibody_version}".csv"
