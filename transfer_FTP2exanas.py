@@ -15,6 +15,8 @@ def supply_args():
     Input arguments
     """
     parser = argparse.ArgumentParser(description='Transfer to exanas')
+    parser.add_argument('--config', type=str, help='nanostring_config.json', default='nanostring_config.json')
+
     args = parser.parse_args()
     return args
 
@@ -22,7 +24,7 @@ def supply_args():
 
 def main():
     args = supply_args()
-    with open("nanostring_config.json", 'r') as cfgfile:
+    with open(args.config, 'r') as cfgfile:
         cfg = json.load(cfgfile)
 
     #Back up entire nCounter system to exanas01
@@ -31,7 +33,7 @@ def main():
     for dir in backdirs:
         destdir = os.path.join(cfg['exanas']['exanas_destdir'], dir)
         if os.path.isdir(destdir):
-            ftp_host.download_datadir(os.path.join("/",cfg['nCounterFTP']['user'],destdir))
+            ftp_host.download_datadir(os.path.join("/",cfg['nCounterFTP']['user']),destdir)
         else:
             os.mkdir(destdir)
             ftp_host.download_datadir(os.path.join("/", cfg['nCounterFTP']['user'], dir), destdir)
