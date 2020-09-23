@@ -28,15 +28,18 @@ def main():
         cfg = json.load(cfgfile)
 
     #Back up entire nCounter system to exanas01
-    ftp_host = nCounter(cfg['nCounterFTP']['host'], cfg['nCounterFTP']['user'], cfg['nCounterFTP']['password'])
+    source_host = cfg['nCounterFTP']['host']
+    source_user = cfg['nCounterFTP']['user']
+    source_password = cfg['nCounterFTP']['password']
+    ftp_host = nCounter(source_host, source_user, source_password)
     backdirs = ["RCCData", "RLFData", "CDFData"]
     for dir in backdirs:
         destdir = os.path.join(cfg['exanas']['exanas_destdir'], dir)
         if os.path.isdir(destdir):
-            ftp_host.download_datadir(os.path.join("/",cfg['nCounterFTP']['user']),destdir)
+            ftp_host.download_datadir(os.path.join("/",source_user),destdir)
         else:
             os.mkdir(destdir)
-            ftp_host.download_datadir(os.path.join("/", cfg['nCounterFTP']['user'], dir), destdir)
+            ftp_host.download_datadir(os.path.join("/",source_user, dir), destdir)
         print("Backed up ", dir)
 
     ftp_host.close()

@@ -3,10 +3,11 @@
 ## author: Janice Patterson
 ## targets nCounter MAX/FLEX system
 
-#import ftputil
+import ftputil
 from ftputil import FTPHost
 import sys
 import os
+import json
 
 class nCounter(FTPHost):
     '''
@@ -38,19 +39,20 @@ class nCounter(FTPHost):
             print("FTP dir is "+ self.getcwd())
             print(self.listdir(self.curdir))
 
+
     def download_batch(self, batch, dest_dir):
         '''
         :param batch: batch id only, path to file /technician/RCCData is taken care of
         :return: download zip to current directory
         '''
         zfile = batch + "_RCC.ZIP"
-        batchpath = self.path.join("./RCCData")
+        batchpath = self.path.join("/technician/RCCData")
         zfiles = self.listdir(batchpath)
         if zfile in zfiles:
             dest_file = os.path.join(dest_dir, zfile)
-            print(zfile + " to ", dest_file)
-
-            self.download(os.path.join(batchpath, zfile), dest_file)
+            print(os.path.join(batchpath, zfile) + " to ", dest_file)
+            source_file = os.path.join(batchpath, zfile)
+            self.download(source_file, dest_file)
         else:
             print(zfile + " DOES NOT EXIST")
             print(zfiles)
