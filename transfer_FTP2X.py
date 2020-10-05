@@ -72,7 +72,6 @@ def main():
     data_dir = os.path.join(dest_data_dir, args.batch)
     zfile = args.batch + "_RCC.ZIP"
     zfile_path = os.path.join(data_dir, zfile)
-    print("starting ftp")
 
     with nCounter(source_host, source_user, source_password) as ftp_host:
         print("ftp host established")
