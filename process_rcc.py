@@ -120,7 +120,6 @@ def parse_samplesheet(samplesheet):
     """
     ss_dict = {}
     with open(samplesheet, 'r') as ss:
-        next(ss)
         for line in ss:
             items = line.strip().split("\t")
             rcc_int = int(items[0].split(".")[0][-2:])
