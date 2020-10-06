@@ -186,7 +186,6 @@ def main():
     print(raw_data.columns)
 
     #omit blanks if flag is true
-    #removes samples whose counts sum to zero.
     idx_of_samples = []
     if args.omit_blank == True:
         for label, content in raw_data.items():
